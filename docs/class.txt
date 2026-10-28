@@ -1,0 +1,124 @@
+@startuml class_domain
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam defaultFontName Arial
+hide circle
+
+class Warehouse {
+  - id : String
+  - name : String
+  - city : String
+}
+
+class AppUser {
+  - uid : String
+  - displayName : String
+  - email : String
+  - role : Role
+  - whId : String
+  - jobTitle : String
+  + initials() : String
+}
+
+class Prediction {
+  - id : String
+  - whId : String
+  - targetDate : Date
+  - predicted : int
+  - projection : int
+  - deviationPct : double
+  - alert : bool
+  - dataStatus : String
+  - source : String
+  - modelVersion : String
+  - generatedAt : DateTime
+  - inputFeatures : Map<String, Object>
+  - featureImportance : Map<String, double>
+  - isBackfill : bool
+  - actualInbound : int
+  - actualNote : String
+  - actualInputBy : String
+  - actualInputAt : DateTime
+  - dailyErrorPct : double
+  - evaluated : bool
+  + deviation() : double
+  + needsAttention() : bool
+  + errorPct() : double
+  + isFallback() : bool
+}
+
+class ManpowerRecommendation {
+  - rider : int
+  - driver : int
+  - opInbound : int
+  - opOutbound : int
+  - configSnapshot : OperationalConfig
+  + total() : int
+}
+
+class OperationalConfig {
+  - whId : String
+  - capacityRider : double
+  - capacityDriver : double
+  - capacityOpInbound : double
+  - capacityOpOutbound : double
+  - ratioRider : double
+  - ratioDriver : double
+  - rounding : String
+  - updatedBy : String
+  - updatedAt : DateTime
+  + rasioValid() : bool
+  + hitungManpower(predicted : int) : ManpowerRecommendation
+}
+
+class DecisionLog {
+  - id : String
+  - predId : String
+  - whId : String
+  - decidedBy : String
+  - decidedByName : String
+  - decision : String
+  - manpowerFinal : Map<String, int>
+  - reason : String
+  - decidedAt : DateTime
+  + isAdjusted() : bool
+}
+
+class ModelHealth {
+  - whId : String
+  - status : String
+  - rollingMae7d : double
+  - baselineMae : double
+  - driftThreshold : double
+  - modelVersion : String
+  - maeValidation : double
+  - rmse : double
+  - r2 : double
+  - updatedAt : DateTime
+  + isDegraded() : bool
+  + threshold() : double
+}
+
+class AppNotification {
+  - id : String
+  - type : String
+  - title : String
+  - body : String
+  - whId : String
+  - targetDate : Date
+  - createdAt : DateTime
+  - audienceRoles : List<Role>
+  + untukRole(role : Role) : bool
+}
+
+Warehouse "1" o-- "0..*" AppUser : menaungi >
+Warehouse "1" -- "0..*" Prediction : memiliki >
+Warehouse "1" -- "1" OperationalConfig : diatur oleh >
+Warehouse "1" -- "1" ModelHealth : dipantau oleh >
+Warehouse "1" -- "0..*" AppNotification : menerbitkan >
+Prediction "1" *-- "0..1" ManpowerRecommendation : berisi >
+OperationalConfig "1" -- "0..*" ManpowerRecommendation : dasar perhitungan >
+Prediction "1" -- "0..*" DecisionLog : diputuskan melalui >
+AppUser "1" -- "0..*" DecisionLog : membuat >
+AppUser "0..*" -- "0..*" AppNotification : membaca >
+@enduml

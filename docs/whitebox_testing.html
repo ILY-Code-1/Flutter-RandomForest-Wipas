@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Whitebox Testing — WIPAS</title><style>
+body{font-family:Inter,Segoe UI,Arial,sans-serif;color:#1B2433;background:#fff;margin:0 auto;max-width:1100px;padding:24px;line-height:1.5}
+h1{color:#1F3A5F;font-size:26px;margin-bottom:4px}h2{color:#1F3A5F;border-bottom:2px solid #DDE3EC;padding-bottom:4px;margin-top:36px}
+h3{color:#1F3A5F;margin-top:24px}.sub{color:#5B6779;margin-top:0}
+.note{background:#E3F0FC;border:1px solid #90CAF9;border-radius:10px;padding:12px 16px;color:#0D3A73}
+.warn{background:#FFF4D6;border:1px solid #F9A825;border-radius:10px;padding:12px 16px;color:#7A4F00}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0 16px}
+th,td{border:1px solid #DDE3EC;padding:5px 7px;vertical-align:top;text-align:left}
+th{background:#1F3A5F;color:#fff}tr:nth-child(even) td{background:#F5F7FA}
+code{background:#EEF1F6;padding:1px 4px;border-radius:4px;font-size:12px}
+pre.plantuml{background:#1B2433;color:#E3F0FC;padding:12px;border-radius:10px;overflow-x:auto;font-size:12px}
+ul.tree{font-family:Consolas,monospace;font-size:13px}ul.tree li{margin:2px 0}
+img.diagram{max-width:100%;border:1px solid #DDE3EC;border-radius:8px;margin:8px 0}
+@media print{pre.plantuml{white-space:pre-wrap;color:#000;background:#fff;border:1px solid #999}h2{page-break-after:avoid}table{page-break-inside:auto}}
+
+td.ok{color:#1B5E20;font-weight:600}td.no{color:#7A4F00;font-weight:600}td.fail{color:#8E1B1B;font-weight:700}
+tr.group td{background:#E6EDF6!important;font-weight:700;color:#1F3A5F}
+</style></head>
+<body><h1>Whitebox Testing — WIPAS</h1><p class="sub">Flowchart, flowgraph, cyclomatic complexity, dan basis path.</p>
+<div class='note'>Fungsi dipilih dari kode nyata dengan percabangan berarti. Kutipan kode diambil langsung dari berkas saat dokumen dibuat (nomor baris nyata). Setiap basis path dipetakan ke test otomatis di <code>test/unit/whitebox_test.dart</code> (nama test diawali ID path); kolom Hasil diisi dari eksekusi nyata.</div>
+<h2>Ringkasan</h2><table><tr><th>No</th><th>Fungsi</th><th>Berkas</th><th>N</th><th>E</th><th>P</th><th>V(G)=E−N+2P</th><th>Keputusan+1</th><th>Basis path</th></tr>
+<tr><td>1</td><td><code>ManpowerCalculator.compute</code></td><td><code>lib/core/domain/calculators.dart:101</code></td><td>3</td><td>2</td><td>1</td><td>1</td><td>1</td><td>1</td></tr><tr><td>2</td><td><code>DeviationCalculator.percent</code></td><td><code>lib/core/domain/calculators.dart:120</code></td><td>6</td><td>8</td><td>1</td><td>4</td><td>4</td><td>4</td></tr><tr><td>3</td><td><code>DeviationCalculator.needsAttention</code></td><td><code>lib/core/domain/calculators.dart:125</code></td><td>7</td><td>8</td><td>1</td><td>3</td><td>3</td><td>3</td></tr><tr><td>4</td><td><code>ConfigValidator.validate</code></td><td><code>lib/core/domain/calculators.dart:179</code></td><td>12</td><td>17</td><td>1</td><td>7</td><td>7</td><td>7</td></tr><tr><td>5</td><td><code>ActualValidator.validate</code></td><td><code>lib/core/domain/calculators.dart:208</code></td><td>13</td><td>18</td><td>1</td><td>7</td><td>7</td><td>7</td></tr><tr><td>6</td><td><code>roleGuard (RoleGuard go_router)</code></td><td><code>lib/router.dart:33</code></td><td>16</td><td>25</td><td>1</td><td>11</td><td>11</td><td>11</td></tr><tr><td>7</td><td><code>CsvExport._cell</code></td><td><code>lib/features/riwayat/csv_export.dart:35</code></td><td>6</td><td>7</td><td>1</td><td>3</td><td>3</td><td>3</td></tr><tr><td>8</td><td><code>toViewState (penentuan state layar)</code></td><td><code>lib/core/state/view_state.dart:34</code></td><td>11</td><td>15</td><td>1</td><td>6</td><td>6</td><td>6</td></tr></table>
+<p>Total basis path: <b>42</b>; lulus otomatis: <b>41</b>; belum diuji: <b>1</b>.</p>
+<h2>1. ManpowerCalculator.compute</h2><h3>Kutipan kode — <code>lib/core/domain/calculators.dart</code> baris 101</h3>
+<pre class='plantuml'> 101    static ManpowerCounts compute(num predicted, CapacityConfig c) {
+ 102      final p = predicted.toDouble();
+ 103      return ManpowerCounts(
+ 104        rider: _ceil(p * c.ratioRider / c.capacityRider),
+ 105        driver: _ceil(p * c.ratioDriver / c.capacityDriver),
+ 106        opInbound: _ceil(p / c.capacityOpInbound),
+ 107        opOutbound: _ceil(p / c.capacityOpOutbound),
+ 108      );
+ 109    }</pre>
+<h3>Flowchart</h3>
+<pre class="plantuml">@startuml wb_01_mp_flowchart
+start
+:p = predicted.toDouble();
+:rider = _ceil(p × ratioRider / capacityRider)
+driver = _ceil(p × ratioDriver / capacityDriver)
+opInbound = _ceil(p / capacityOpInbound)
+opOutbound = _ceil(p / capacityOpOutbound);
+:return ManpowerCounts;
+stop
+@enduml</pre>
+<p><img class="diagram" src="img/wb_01_mp_flowchart.png" alt="wb_01_mp_flowchart"></p>
+<h3>Flowgraph</h3>
+<pre class="plantuml">@startuml wb_01_mp_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle &quot;1&quot; as n1
+circle &quot;2&quot; as n2
+circle &quot;3&quot; as n3
+n1 --&gt; n2
+n2 --&gt; n3
+legend right
+  1: p = toDouble
+  2: 4 × _ceil (tanpa cabang)
+  3: return
+endlegend
+@enduml</pre>
+<p><img class="diagram" src="img/wb_01_mp_flowgraph.png" alt="wb_01_mp_flowgraph"></p>
+<h3>Cyclomatic complexity</h3>
+<table><tr><th>E (edge)</th><th>N (node)</th><th>P (komponen)</th><th>V(G) = E − N + 2P</th><th>Jumlah keputusan + 1</th></tr><tr><td>2</td><td>3</td><td>1</td><td>2 − 3 + 2 = <b>1</b></td><td>0 + 1 = <b>1</b></td></tr></table>
+<p>Edge: 1→2, 2→3.</p>
+<h3>Basis path & test case</h3><table><tr><th>ID</th><th>Jalur</th><th>Input</th><th>Hasil yang diharapkan</th><th>Test otomatis</th><th>Hasil</th><th>Status</th></tr>
+<tr><td>WB-MP-P1</td><td>1-2-3</td><td>predicted 18.420, kapasitas default</td><td>37 / 7 / 37 / 31</td><td>ManpowerCalculator.compute WB-MP-P1 sequential path: 18.420 → 37/7/37/31</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+</table>
+<h2>2. DeviationCalculator.percent</h2><h3>Kutipan kode — <code>lib/core/domain/calculators.dart</code> baris 120</h3>
+<pre class='plantuml'> 120    static double? percent(num? predicted, num? projection) {
+ 121      if (predicted == null || projection == null || projection &lt;= 0) return null;
+ 122      return (predicted - projection) / projection * 100;
+ 123    }</pre>
+<h3>Flowchart</h3>
+<pre class="plantuml">@startuml wb_02_dp_flowchart
+start
+if (predicted == null?) then (ya)
+  :return null;
+  stop
+elseif (projection == null?) then (ya)
+  :return null;
+  stop
+elseif (projection &lt;= 0?) then (ya)
+  :return null;
+  stop
+else (tidak)
+  :return (predicted − projection) / projection × 100;
+  stop
+endif
+@enduml</pre>
+<p><img class="diagram" src="img/wb_02_dp_flowchart.png" alt="wb_02_dp_flowchart"></p>
+<h3>Flowgraph</h3>
+<pre class="plantuml">@startuml wb_02_dp_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle &quot;1&quot; as n1
+circle &quot;2&quot; as n2
+circle &quot;3&quot; as n3
+circle &quot;4&quot; as n4
+circle &quot;5&quot; as n5
+circle &quot;6&quot; as n6
+n1 --&gt; n4
+n1 --&gt; n2
+n2 --&gt; n4
+n2 --&gt; n3
+n3 --&gt; n4
+n3 --&gt; n5
+n4 --&gt; n6
+n5 --&gt; n6
+legend right
+  1: predicted == null?
+  2: projection == null?
+  3: projection &lt;= 0?
+  4: return null
+  5: return deviasi
+  6: exit
+endlegend
+@enduml</pre>
+<p><img class="diagram" src="img/wb_02_dp_flowgraph.png" alt="wb_02_dp_flowgraph"></p>
+<h3>Cyclomatic complexity</h3>
+<table><tr><th>E (edge)</th><th>N (node)</th><th>P (komponen)</th><th>V(G) = E − N + 2P</th><th>Jumlah keputusan + 1</th></tr><tr><td>8</td><td>6</td><td>1</td><td>8 − 6 + 2 = <b>4</b></td><td>3 + 1 = <b>4</b></td></tr></table>
+<p>Edge: 1→4, 1→2, 2→4, 2→3, 3→4, 3→5, 4→6, 5→6.</p>
+<h3>Basis path & test case</h3><table><tr><th>ID</th><th>Jalur</th><th>Input</th><th>Hasil yang diharapkan</th><th>Test otomatis</th><th>Hasil</th><th>Status</th></tr>
+<tr><td>WB-DP-P1</td><td>1-4-6</td><td>predicted null, projection 15.900</td><td>null</td><td>DeviationCalculator.percent WB-DP-P1 predicted null → null</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-DP-P2</td><td>1-2-4-6</td><td>predicted 18.420, projection null</td><td>null</td><td>DeviationCalculator.percent WB-DP-P2 projection null → null</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-DP-P3</td><td>1-2-3-4-6</td><td>projection 0</td><td>null</td><td>DeviationCalculator.percent WB-DP-P3 projection ≤ 0 → null</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-DP-P4</td><td>1-2-3-5-6</td><td>18.420 vs 15.900</td><td>15,85</td><td>DeviationCalculator.percent WB-DP-P4 valid → 15,85</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+</table>
+<h2>3. DeviationCalculator.needsAttention</h2><h3>Kutipan kode — <code>lib/core/domain/calculators.dart</code> baris 125</h3>
+<pre class='plantuml'> 125    static bool needsAttention(double? deviationPct) {
+ 126      if (deviationPct == null) return false;
+ 127      // Round to 4 decimals to avoid flagging 15.000000001 caused by float math.
+ 128      final v = (deviationPct.abs() * 10000).roundToDouble() / 10000;
+ 129      return v &gt; thresholdPct;
+ 130    }</pre>
+<h3>Flowchart</h3>
+<pre class="plantuml">@startuml wb_03_dn_flowchart
+start
+if (deviationPct == null?) then (ya)
+  :return false;
+  stop
+else (tidak)
+  :v = |deviationPct| dibulatkan 4 desimal;
+  if (v &gt; 15?) then (ya)
+    :return true;
+  else (tidak)
+    :return false;
+  endif
+  stop
+endif
+@enduml</pre>
+<p><img class="diagram" src="img/wb_03_dn_flowchart.png" alt="wb_03_dn_flowchart"></p>
+<h3>Flowgraph</h3>
+<pre class="plantuml">@startuml wb_03_dn_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle &quot;1&quot; as n1
+circle &quot;2&quot; as n2
+circle &quot;3&quot; as n3
+circle &quot;4&quot; as n4
+circle &quot;5&quot; as n5
+circle &quot;6&quot; as n6
+circle &quot;7&quot; as n7
+n1 --&gt; n2
+n1 --&gt; n3
+n3 --&gt; n4
+n4 --&gt; n5
+n4 --&gt; n6
+n2 --&gt; n7
+n5 --&gt; n7
+n6 --&gt; n7
+legend right
+  1: null?
+  2: return false
+  3: v = round(|d|)
+  4: v &gt; 15?
+  5: return true
+  6: return false
+  7: exit
+endlegend
+@enduml</pre>
+<p><img class="diagram" src="img/wb_03_dn_flowgraph.png" alt="wb_03_dn_flowgraph"></p>
+<h3>Cyclomatic complexity</h3>
+<table><tr><th>E (edge)</th><th>N (node)</th><th>P (komponen)</th><th>V(G) = E − N + 2P</th><th>Jumlah keputusan + 1</th></tr><tr><td>8</td><td>7</td><td>1</td><td>8 − 7 + 2 = <b>3</b></td><td>2 + 1 = <b>3</b></td></tr></table>
+<p>Edge: 1→2, 1→3, 3→4, 4→5, 4→6, 2→7, 5→7, 6→7.</p>
+<h3>Basis path & test case</h3><table><tr><th>ID</th><th>Jalur</th><th>Input</th><th>Hasil yang diharapkan</th><th>Test otomatis</th><th>Hasil</th><th>Status</th></tr>
+<tr><td>WB-DN-P1</td><td>1-2-7</td><td>null</td><td>false</td><td>DeviationCalculator.needsAttention WB-DN-P1 null → false</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-DN-P2</td><td>1-3-4-6-7</td><td>15,0</td><td>false</td><td>DeviationCalculator.needsAttention WB-DN-P2 exactly 15 → false</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-DN-P3</td><td>1-3-4-5-7</td><td>15,8</td><td>true</td><td>DeviationCalculator.needsAttention WB-DN-P3 15,8 → true</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+</table>
+<h2>4. ConfigValidator.validate</h2><h3>Kutipan kode — <code>lib/core/domain/calculators.dart</code> baris 179</h3>
+<pre class='plantuml'> 179    static ConfigValidation validate(Map&lt;String, num?&gt; values) {
+ 180      final errors = &lt;String, String&gt;{};
+ 181      values.forEach((key, v) {
+ 182        if (v == null) {
+ 183          errors[key] = msgEmpty;
+ 184        } else if (v &lt;= 0) {
+ 185          errors[key] = msgPositive;
+ 186        }
+ 187      });
+ 188      String? ratioError;
+ 189      final rr = values[&#x27;ratio_rider&#x27;];
+ 190      final rd = values[&#x27;ratio_driver&#x27;];
+ 191      if (rr != null &amp;&amp; rd != null) {
+ 192        final sum = rr + rd;
+ 193        if ((sum - 1.0).abs() &gt; ratioTolerance) ratioError = msgRatio(sum.toDouble());
+ 194      }
+ 195      return ConfigValidation(errors, ratioError);
+ 196    }
+ 197  }</pre>
+<h3>Flowchart</h3>
+<pre class="plantuml">@startuml wb_04_cv_flowchart
+start
+:errors = {};
+while (masih ada entri values?) is (ya)
+  if (v == null?) then (ya)
+    :errors[key] = &quot;Wajib diisi dengan angka.&quot;;
+  elseif (v &lt;= 0?) then (ya)
+    :errors[key] = &quot;Nilai harus lebih dari 0.&quot;;
+  else (tidak)
+  endif
+endwhile (tidak)
+if (ratio_rider != null?) then (ya)
+  if (ratio_driver != null?) then (ya)
+    if (|rr + rd − 1| &gt; 0,001?) then (ya)
+      :ratioError = msgRatio(sum);
+    endif
+  endif
+endif
+:return ConfigValidation(errors, ratioError);
+stop
+@enduml</pre>
+<p><img class="diagram" src="img/wb_04_cv_flowchart.png" alt="wb_04_cv_flowchart"></p>
+<h3>Flowgraph</h3>
+<pre class="plantuml">@startuml wb_04_cv_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle &quot;1&quot; as n1
+circle &quot;2&quot; as n2
+circle &quot;3&quot; as n3
+circle &quot;4&quot; as n4
+circle &quot;5&quot; as n5
+circle &quot;6&quot; as n6
+circle &quot;7&quot; as n7
+circle &quot;8&quot; as n8
+circle &quot;9&quot; as n9
+circle &quot;10&quot; as n10
+circle &quot;11&quot; as n11
+circle &quot;12&quot; as n12
+n1 --&gt; n2
+n2 --&gt; n3
+n2 --&gt; n8
+n3 --&gt; n4
+n3 --&gt; n5
+n4 --&gt; n7
+n5 --&gt; n6
+n5 --&gt; n7
+n6 --&gt; n7
+n7 --&gt; n2
+n8 --&gt; n9
+n8 --&gt; n12
+n9 --&gt; n10
+n9 --&gt; n12
+n10 --&gt; n11
+n10 --&gt; n12
+n11 --&gt; n12
+legend right
+  1: errors = {}
+  2: ada entri?
+  3: v == null?
+  4: err kosong
+  5: v &lt;= 0?
+  6: err &gt; 0
+  7: lanjut
+  8: rr != null?
+  9: rd != null?
+  10: |sum−1| &gt; tol?
+  11: ratioError
+  12: return
+endlegend
+@enduml</pre>
+<p><img class="diagram" src="img/wb_04_cv_flowgraph.png" alt="wb_04_cv_flowgraph"></p>
+<h3>Cyclomatic complexity</h3>
+<table><tr><th>E (edge)</th><th>N (node)</th><th>P (komponen)</th><th>V(G) = E − N + 2P</th><th>Jumlah keputusan + 1</th></tr><tr><td>17</td><td>12</td><td>1</td><td>17 − 12 + 2 = <b>7</b></td><td>6 + 1 = <b>7</b></td></tr></table>
+<p>Edge: 1→2, 2→3, 2→8, 3→4, 3→5, 4→7, 5→6, 5→7, 6→7, 7→2, 8→9, 8→12, 9→10, 9→12, 10→11, 10→12, 11→12.</p>
+<h3>Basis path & test case</h3><table><tr><th>ID</th><th>Jalur</th><th>Input</th><th>Hasil yang diharapkan</th><th>Test otomatis</th><th>Hasil</th><th>Status</th></tr>
+<tr><td>WB-CV-P1</td><td>1-2-8-12</td><td>{}</td><td>valid</td><td>ConfigValidator.validate WB-CV-P1 empty map: loop skipped, no ratio → valid</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-CV-P2</td><td>1-2-3-4-7-2-8-12</td><td>capacity_rider = null</td><td>&quot;Wajib diisi dengan angka.&quot;</td><td>ConfigValidator.validate WB-CV-P2 null value → &quot;Wajib diisi&quot;</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-CV-P3</td><td>1-2-3-5-6-7-2-8-12</td><td>capacity_rider = 0</td><td>&quot;Nilai harus lebih dari 0.&quot;</td><td>ConfigValidator.validate WB-CV-P3 value ≤ 0 → &quot;Nilai harus lebih dari 0.&quot;</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-CV-P4</td><td>1-2-3-5-7-2-8-12</td><td>capacity_rider = 350</td><td>valid</td><td>ConfigValidator.validate WB-CV-P4 positive value, ratio_rider missing → valid</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-CV-P5</td><td>1-2-3-5-7-2-8-9-12</td><td>ratio_rider = 0,7 saja</td><td>tanpa galat rasio</td><td>ConfigValidator.validate WB-CV-P5 ratio_rider present, ratio_driver missing → no ratio check</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-CV-P6</td><td>1-2-…-8-9-10-12</td><td>350/800/500/600, 0,70/0,30</td><td>valid</td><td>ConfigValidator.validate WB-CV-P6 ratios sum to 1,00 → valid</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-CV-P7</td><td>1-2-…-8-9-10-11-12</td><td>ratio 0,60 + 0,30</td><td>&quot;…harus = 1,00 (saat ini 0,90).&quot;</td><td>ConfigValidator.validate WB-CV-P7 ratios 0,60 + 0,30 → ratio error</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+</table>
+<h2>5. ActualValidator.validate</h2><h3>Kutipan kode — <code>lib/core/domain/calculators.dart</code> baris 208</h3>
+<pre class='plantuml'> 208    static String? validate(String text) {
+ 209      final t = text.trim();
+ 210      if (t.isEmpty) return msgEmpty;
+ 211      if (t.startsWith(&#x27;-&#x27;) || t.startsWith(&#x27;−&#x27;)) return msgNegative;
+ 212      if (!RegExp(r&#x27;^[0-9.]+$&#x27;).hasMatch(t)) return msgNotInteger;
+ 213      final cleaned = t.replaceAll(&#x27;.&#x27;, &#x27;&#x27;);
+ 214      if (cleaned.isEmpty || int.tryParse(cleaned) == null) return msgNotInteger;
+ 215      return null;</pre>
+<h3>Flowchart</h3>
+<pre class="plantuml">@startuml wb_05_av_flowchart
+start
+:t = text.trim();
+if (t kosong?) then (ya)
+  :return &quot;Actual inbound wajib diisi.&quot;;
+  stop
+elseif (diawali &quot;-&quot; atau &quot;−&quot;?) then (ya)
+  :return &quot;Nilai tidak boleh negatif.&quot;;
+  stop
+elseif (bukan pola [0-9.]+?) then (ya)
+  :return &quot;Masukkan angka bulat…&quot;;
+  stop
+else (tidak)
+  :cleaned = hapus titik;
+  if (cleaned kosong atau tryParse null?) then (ya)
+    :return &quot;Masukkan angka bulat…&quot;;
+  else (tidak)
+    :return null (valid);
+  endif
+  stop
+endif
+@enduml</pre>
+<p><img class="diagram" src="img/wb_05_av_flowchart.png" alt="wb_05_av_flowchart"></p>
+<h3>Flowgraph</h3>
+<pre class="plantuml">@startuml wb_05_av_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle &quot;1&quot; as n1
+circle &quot;2&quot; as n2
+circle &quot;3&quot; as n3
+circle &quot;4&quot; as n4
+circle &quot;5&quot; as n5
+circle &quot;6&quot; as n6
+circle &quot;7&quot; as n7
+circle &quot;8&quot; as n8
+circle &quot;9&quot; as n9
+circle &quot;10&quot; as n10
+circle &quot;11&quot; as n11
+circle &quot;12&quot; as n12
+circle &quot;13&quot; as n13
+n1 --&gt; n2
+n2 --&gt; n3
+n2 --&gt; n4
+n4 --&gt; n6
+n4 --&gt; n5
+n5 --&gt; n6
+n5 --&gt; n7
+n7 --&gt; n8
+n7 --&gt; n9
+n9 --&gt; n11
+n9 --&gt; n10
+n10 --&gt; n11
+n10 --&gt; n12
+n3 --&gt; n13
+n6 --&gt; n13
+n8 --&gt; n13
+n11 --&gt; n13
+n12 --&gt; n13
+legend right
+  1: trim
+  2: kosong?
+  3: ret wajib
+  4: &#x27;-&#x27;?
+  5: &#x27;−&#x27;?
+  6: ret negatif
+  7: pola?
+  8: ret bulat
+  9: cleaned kosong?
+  10: tryParse null?
+  11: ret bulat
+  12: ret null
+  13: exit
+endlegend
+@enduml</pre>
+<p><img class="diagram" src="img/wb_05_av_flowgraph.png" alt="wb_05_av_flowgraph"></p>
+<h3>Cyclomatic complexity</h3>
+<table><tr><th>E (edge)</th><th>N (node)</th><th>P (komponen)</th><th>V(G) = E − N + 2P</th><th>Jumlah keputusan + 1</th></tr><tr><td>18</td><td>13</td><td>1</td><td>18 − 13 + 2 = <b>7</b></td><td>6 + 1 = <b>7</b></td></tr></table>
+<p>Edge: 1→2, 2→3, 2→4, 4→6, 4→5, 5→6, 5→7, 7→8, 7→9, 9→11, 9→10, 10→11, 10→12, 3→13, 6→13, 8→13, 11→13, 12→13.</p>
+<h3>Basis path & test case</h3><table><tr><th>ID</th><th>Jalur</th><th>Input</th><th>Hasil yang diharapkan</th><th>Test otomatis</th><th>Hasil</th><th>Status</th></tr>
+<tr><td>WB-AV-P1</td><td>1-2-3-13</td><td>&quot; &quot;</td><td>wajib diisi</td><td>ActualValidator.validate WB-AV-P1 empty → wajib diisi</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-AV-P2</td><td>1-2-4-6-13</td><td>-5</td><td>negatif</td><td>ActualValidator.validate WB-AV-P2 &quot;-5&quot; → negatif</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-AV-P3</td><td>1-2-4-5-6-13</td><td>−5</td><td>negatif</td><td>ActualValidator.validate WB-AV-P3 &quot;−5&quot; (minus sign) → negatif</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-AV-P4</td><td>1-2-4-5-7-8-13</td><td>17,5</td><td>angka bulat</td><td>ActualValidator.validate WB-AV-P4 &quot;17,5&quot; → bukan angka bulat</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-AV-P5</td><td>1-2-4-5-7-9-11-13</td><td>.</td><td>angka bulat</td><td>ActualValidator.validate WB-AV-P5 &quot;.&quot; → kosong setelah dibersihkan</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-AV-P6</td><td>1-2-4-5-7-9-10-11-13</td><td>99999999999999999999999</td><td>angka bulat</td><td>ActualValidator.validate WB-AV-P6 angka melampaui int64 → bukan angka bulat</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-AV-P7</td><td>1-2-4-5-7-9-10-12-13</td><td>17.560</td><td>null (valid)</td><td>ActualValidator.validate WB-AV-P7 &quot;17.560&quot; → valid</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+</table>
+<h2>6. roleGuard (RoleGuard go_router)</h2><h3>Kutipan kode — <code>lib/router.dart</code> baris 33</h3>
+<pre class='plantuml'>  33  String? roleGuard(AuthState auth, Uri uri) {
+  34    final path = uri.path;
+  35    if (path == Routes.gallery) return kDebugMode ? null : Routes.splash;
+  36    if (path == Routes.splash) return null;
+  37    switch (auth.status) {
+  38      case AuthStatus.unknown:
+  39        return Routes.splash;
+  40      case AuthStatus.signedOut:
+  41        if (Routes.public.contains(path)) return null;
+  42        return auth.sessionExpired ? &#x27;${Routes.login}?expired=1&#x27; : Routes.login;
+  43      case AuthStatus.signedIn:
+  44        if (path == Routes.login || path == Routes.forgotPassword) return Routes.beranda;
+  45        final role = auth.user!.role;
+  46        return AccessMatrix.canOpen(role, path) ? null : Routes.beranda;
+  47    }
+  48  }</pre>
+<h3>Flowchart</h3>
+<pre class="plantuml">@startuml wb_06_rg_flowchart
+start
+if (path == /dev/gallery?) then (ya)
+  if (kDebugMode?) then (ya)
+    :return null;
+  else (tidak)
+    :return /splash;
+  endif
+  stop
+elseif (path == /splash?) then (ya)
+  :return null;
+  stop
+else (tidak)
+  switch (auth.status)
+  case (unknown)
+    :return /splash;
+  case (signedOut)
+    if (rute publik?) then (ya)
+      :return null;
+    elseif (sessionExpired?) then (ya)
+      :return /login?expired=1;
+    else (tidak)
+      :return /login;
+    endif
+  case (signedIn)
+    if (path == /login atau /login/lupa?) then (ya)
+      :return /beranda;
+    elseif (AccessMatrix.canOpen?) then (ya)
+      :return null;
+    else (tidak)
+      :return /beranda;
+    endif
+  endswitch
+  stop
+endif
+@enduml</pre>
+<p><img class="diagram" src="img/wb_06_rg_flowchart.png" alt="wb_06_rg_flowchart"></p>
+<h3>Flowgraph</h3>
+<pre class="plantuml">@startuml wb_06_rg_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle &quot;1&quot; as n1
+circle &quot;2&quot; as n2
+circle &quot;3&quot; as n3
+circle &quot;4&quot; as n4
+circle &quot;5&quot; as n5
+circle &quot;6&quot; as n6
+circle &quot;7&quot; as n7
+circle &quot;8&quot; as n8
+circle &quot;9&quot; as n9
+circle &quot;10&quot; as n10
+circle &quot;11&quot; as n11
+circle &quot;12&quot; as n12
+circle &quot;13&quot; as n13
+circle &quot;14&quot; as n14
+circle &quot;15&quot; as n15
+circle &quot;16&quot; as n16
+n1 --&gt; n2
+n2 --&gt; n3
+n2 --&gt; n6
+n3 --&gt; n4
+n3 --&gt; n5
+n6 --&gt; n4
+n6 --&gt; n7
+n7 --&gt; n5
+n7 --&gt; n8
+n7 --&gt; n12
+n8 --&gt; n4
+n8 --&gt; n9
+n9 --&gt; n10
+n9 --&gt; n11
+n12 --&gt; n15
+n12 --&gt; n13
+n13 --&gt; n15
+n13 --&gt; n14
+n14 --&gt; n4
+n14 --&gt; n15
+n4 --&gt; n16
+n5 --&gt; n16
+n10 --&gt; n16
+n11 --&gt; n16
+n15 --&gt; n16
+legend right
+  1: path
+  2: gallery?
+  3: kDebugMode?
+  4: return null
+  5: return /splash
+  6: splash?
+  7: status?
+  8: publik?
+  9: expired?
+  10: /login?expired=1
+  11: /login
+  12: == /login?
+  13: == /login/lupa?
+  14: canOpen?
+  15: return /beranda
+  16: exit
+endlegend
+@enduml</pre>
+<p><img class="diagram" src="img/wb_06_rg_flowgraph.png" alt="wb_06_rg_flowgraph"></p>
+<h3>Cyclomatic complexity</h3>
+<table><tr><th>E (edge)</th><th>N (node)</th><th>P (komponen)</th><th>V(G) = E − N + 2P</th><th>Jumlah keputusan + 1</th></tr><tr><td>25</td><td>16</td><td>1</td><td>25 − 16 + 2 = <b>11</b></td><td>10 + 1 = <b>11</b></td></tr></table>
+<p>Edge: 1→2, 2→3, 2→6, 3→4, 3→5, 6→4, 6→7, 7→5, 7→8, 7→12, 8→4, 8→9, 9→10, 9→11, 12→15, 12→13, 13→15, 13→14, 14→4, 14→15, 4→16, 5→16, 10→16, 11→16, 15→16.</p>
+<h3>Basis path & test case</h3><table><tr><th>ID</th><th>Jalur</th><th>Input</th><th>Hasil yang diharapkan</th><th>Test otomatis</th><th>Hasil</th><th>Status</th></tr>
+<tr><td>WB-RG-P1</td><td>1-2-3-4-16</td><td>/dev/gallery (debug)</td><td>null</td><td>roleGuard WB-RG-P1 /dev/gallery in debug → allowed</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-RG-P2</td><td>1-2-3-5-16</td><td>/dev/gallery (rilis)</td><td>/splash</td><td>test belum ada: WB-RG-P2 </td><td>—</td><td class="no">Belum diuji</td></tr>
+<tr><td>WB-RG-P3</td><td>1-2-6-4-16</td><td>/splash</td><td>null</td><td>roleGuard WB-RG-P3 /splash → allowed</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-RG-P4</td><td>1-2-6-7-5-16</td><td>unknown, /beranda</td><td>/splash</td><td>roleGuard WB-RG-P4 unknown session → /splash</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-RG-P5</td><td>1-2-6-7-8-4-16</td><td>signedOut, /login</td><td>null</td><td>roleGuard WB-RG-P5 signed out on public route → allowed</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-RG-P6</td><td>1-2-6-7-8-9-10-16</td><td>signedOut + expired, /beranda</td><td>/login?expired=1</td><td>roleGuard WB-RG-P6 signed out, session expired → /login?expired=1</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-RG-P7</td><td>1-2-6-7-8-9-11-16</td><td>signedOut, /manpower</td><td>/login</td><td>roleGuard WB-RG-P7 signed out → /login</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-RG-P8</td><td>1-2-6-7-12-15-16</td><td>admin, /login</td><td>/beranda</td><td>roleGuard WB-RG-P8 signed in on /login → /beranda</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-RG-P9</td><td>1-2-6-7-12-13-15-16</td><td>viewer, /login/lupa</td><td>/beranda</td><td>roleGuard WB-RG-P9 signed in on /login/lupa → /beranda</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-RG-P10</td><td>1-2-6-7-12-13-14-4-16</td><td>manajer, /konfigurasi</td><td>null</td><td>roleGuard WB-RG-P10 allowed route → null</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-RG-P11</td><td>1-2-6-7-12-13-14-15-16</td><td>viewer, /manpower</td><td>/beranda</td><td>roleGuard WB-RG-P11 Viewer on /manpower → /beranda</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+</table>
+<div class='warn'>WB-RG-P2 tidak dapat dieksekusi di test karena kDebugMode adalah konstanta kompilasi (selalu true saat flutter test); jalur ini hanya dapat diverifikasi manual pada APK rilis.</div>
+<h2>7. CsvExport._cell</h2><h3>Kutipan kode — <code>lib/features/riwayat/csv_export.dart</code> baris 35</h3>
+<pre class='plantuml'>  35    static String _cell(Object? v) {
+  36      if (v == null) return &#x27;&#x27;;
+  37      final s = v.toString();
+  38      if (s.contains(RegExp(r&#x27;[&quot;,\r\n]&#x27;))) return &#x27;&quot;${s.replaceAll(&#x27;&quot;&#x27;, &#x27;&quot;&quot;&#x27;)}&quot;&#x27;;
+  39      return s;
+  40    }</pre>
+<h3>Flowchart</h3>
+<pre class="plantuml">@startuml wb_07_cs_flowchart
+start
+if (v == null?) then (ya)
+  :return &quot;&quot;;
+else (tidak)
+  :s = v.toString();
+  if (s memuat &quot; , CR atau LF?) then (ya)
+    :return &quot;\&quot;&quot; + s (kutip digandakan) + &quot;\&quot;&quot;;
+  else (tidak)
+    :return s;
+  endif
+endif
+stop
+@enduml</pre>
+<p><img class="diagram" src="img/wb_07_cs_flowchart.png" alt="wb_07_cs_flowchart"></p>
+<h3>Flowgraph</h3>
+<pre class="plantuml">@startuml wb_07_cs_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle &quot;1&quot; as n1
+circle &quot;2&quot; as n2
+circle &quot;3&quot; as n3
+circle &quot;4&quot; as n4
+circle &quot;5&quot; as n5
+circle &quot;6&quot; as n6
+n1 --&gt; n2
+n1 --&gt; n3
+n3 --&gt; n4
+n3 --&gt; n5
+n2 --&gt; n6
+n4 --&gt; n6
+n5 --&gt; n6
+legend right
+  1: null?
+  2: return &#x27;&#x27;
+  3: perlu kutip?
+  4: return kutip
+  5: return s
+  6: exit
+endlegend
+@enduml</pre>
+<p><img class="diagram" src="img/wb_07_cs_flowgraph.png" alt="wb_07_cs_flowgraph"></p>
+<h3>Cyclomatic complexity</h3>
+<table><tr><th>E (edge)</th><th>N (node)</th><th>P (komponen)</th><th>V(G) = E − N + 2P</th><th>Jumlah keputusan + 1</th></tr><tr><td>7</td><td>6</td><td>1</td><td>7 − 6 + 2 = <b>3</b></td><td>2 + 1 = <b>3</b></td></tr></table>
+<p>Edge: 1→2, 1→3, 3→4, 3→5, 2→6, 4→6, 5→6.</p>
+<h3>Basis path & test case</h3><table><tr><th>ID</th><th>Jalur</th><th>Input</th><th>Hasil yang diharapkan</th><th>Test otomatis</th><th>Hasil</th><th>Status</th></tr>
+<tr><td>WB-CS-P1</td><td>1-2-6</td><td>actual null</td><td>sel kosong</td><td>CsvExport._cell (via build) WB-CS-P1 null value → empty cell</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-CS-P2</td><td>1-3-5-6</td><td>17560</td><td>17560</td><td>CsvExport._cell (via build) WB-CS-P2 plain value → unchanged</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-CS-P3</td><td>1-3-4-6</td><td>rute &quot;padat&quot;, hujan</td><td>&quot;rute &quot;&quot;padat&quot;&quot;, hujan&quot;</td><td>CsvExport._cell (via build) WB-CS-P3 value with comma/quote → quoted and escaped</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+</table>
+<h2>8. toViewState (penentuan state layar)</h2><h3>Kutipan kode — <code>lib/core/state/view_state.dart</code> baris 34</h3>
+<pre class='plantuml'>  34  ViewState&lt;T&gt; toViewState&lt;T&gt;(
+  35    AsyncValue&lt;T&gt; value, {
+  36    required bool offline,
+  37    DateTime? lastSync,
+  38    bool Function(T data)? isEmpty,
+  39  }) {
+  40    if (value.hasValue) {
+  41      final data = value.requireValue;
+  42      if (isEmpty != null &amp;&amp; isEmpty(data)) {
+  43        // Nothing cached and nothing to show: still an empty state, the offline
+  44        // banner is rendered separately by the screen.
+  45        return ViewEmpty&lt;T&gt;();
+  46      }
+  47      if (offline) return ViewOffline&lt;T&gt;(data, lastSync);
+  48      return ViewData&lt;T&gt;(data);
+  49    }
+  50    if (value.hasError) return ViewError&lt;T&gt;(value.error!);
+  51    return ViewLoading&lt;T&gt;();
+  52  }</pre>
+<h3>Flowchart</h3>
+<pre class="plantuml">@startuml wb_08_vs_flowchart
+start
+if (value.hasValue?) then (ya)
+  if (isEmpty != null dan isEmpty(data)?) then (ya)
+    :return ViewEmpty;
+  elseif (offline?) then (ya)
+    :return ViewOffline(data, lastSync);
+  else (tidak)
+    :return ViewData(data);
+  endif
+elseif (value.hasError?) then (ya)
+  :return ViewError;
+else (tidak)
+  :return ViewLoading;
+endif
+stop
+@enduml</pre>
+<p><img class="diagram" src="img/wb_08_vs_flowchart.png" alt="wb_08_vs_flowchart"></p>
+<h3>Flowgraph</h3>
+<pre class="plantuml">@startuml wb_08_vs_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle &quot;1&quot; as n1
+circle &quot;2&quot; as n2
+circle &quot;3&quot; as n3
+circle &quot;4&quot; as n4
+circle &quot;5&quot; as n5
+circle &quot;6&quot; as n6
+circle &quot;7&quot; as n7
+circle &quot;8&quot; as n8
+circle &quot;9&quot; as n9
+circle &quot;10&quot; as n10
+circle &quot;11&quot; as n11
+n1 --&gt; n2
+n1 --&gt; n8
+n2 --&gt; n3
+n2 --&gt; n5
+n3 --&gt; n4
+n3 --&gt; n5
+n5 --&gt; n6
+n5 --&gt; n7
+n8 --&gt; n9
+n8 --&gt; n10
+n4 --&gt; n11
+n6 --&gt; n11
+n7 --&gt; n11
+n9 --&gt; n11
+n10 --&gt; n11
+legend right
+  1: hasValue?
+  2: isEmpty != null?
+  3: isEmpty(data)?
+  4: Empty
+  5: offline?
+  6: Offline
+  7: Data
+  8: hasError?
+  9: Error
+  10: Loading
+  11: exit
+endlegend
+@enduml</pre>
+<p><img class="diagram" src="img/wb_08_vs_flowgraph.png" alt="wb_08_vs_flowgraph"></p>
+<h3>Cyclomatic complexity</h3>
+<table><tr><th>E (edge)</th><th>N (node)</th><th>P (komponen)</th><th>V(G) = E − N + 2P</th><th>Jumlah keputusan + 1</th></tr><tr><td>15</td><td>11</td><td>1</td><td>15 − 11 + 2 = <b>6</b></td><td>5 + 1 = <b>6</b></td></tr></table>
+<p>Edge: 1→2, 1→8, 2→3, 2→5, 3→4, 3→5, 5→6, 5→7, 8→9, 8→10, 4→11, 6→11, 7→11, 9→11, 10→11.</p>
+<h3>Basis path & test case</h3><table><tr><th>ID</th><th>Jalur</th><th>Input</th><th>Hasil yang diharapkan</th><th>Test otomatis</th><th>Hasil</th><th>Status</th></tr>
+<tr><td>WB-VS-P1</td><td>1-8-10-11</td><td>AsyncLoading</td><td>ViewLoading</td><td>toViewState WB-VS-P1 loading</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-VS-P2</td><td>1-8-9-11</td><td>AsyncError</td><td>ViewError</td><td>toViewState WB-VS-P2 error</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-VS-P3</td><td>1-2-5-7-11</td><td>AsyncData([]), tanpa isEmpty, online</td><td>ViewData</td><td>toViewState WB-VS-P3 data without isEmpty callback, online</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-VS-P4</td><td>1-2-3-4-11</td><td>AsyncData([]), isEmpty</td><td>ViewEmpty</td><td>toViewState WB-VS-P4 data judged empty</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-VS-P5</td><td>1-2-3-5-6-11</td><td>AsyncData([1]), offline</td><td>ViewOffline</td><td>toViewState WB-VS-P5 data, offline → Offline with lastSync</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+<tr><td>WB-VS-P6</td><td>1-2-3-5-7-11</td><td>AsyncData([1]), online</td><td>ViewData</td><td>toViewState WB-VS-P6 data, online, not empty → Data</td><td>Sesuai harapan (test otomatis)</td><td class="ok">Lulus</td></tr>
+</table>
+<p class="sub">Dibuat oleh <code>tools/gen_test_docs.py</code>. Hasil otomatis diambil dari <code>flutter test --reporter json</code>
+(ringkasan: <a href="test_results.txt">test_results.txt</a>).</p></body></html>

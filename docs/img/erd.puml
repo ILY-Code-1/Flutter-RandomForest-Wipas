@@ -1,0 +1,224 @@
+@startuml erd
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide circle
+skinparam linetype ortho
+left to right direction
+entity Warehouse {
+  * wh_id : VARCHAR <<PK>>
+  --
+  * name : VARCHAR
+  city : VARCHAR
+}
+entity AppUser {
+  * uid : VARCHAR <<PK>>
+  --
+  * wh_id : VARCHAR <<FK>>
+  * display_name : VARCHAR
+  * email : VARCHAR
+  * role : VARCHAR
+  job_title : VARCHAR
+}
+entity DailyData {
+  * daily_id : VARCHAR <<PK>>
+  --
+  * wh_id : VARCHAR <<FK>>
+  * date : DATE
+  * day_of_week : SMALLINT
+  * month : SMALLINT
+  * is_campaign : BOOLEAN
+  * is_holiday : BOOLEAN
+  * is_payday : BOOLEAN
+  pickup_request_h1 : INTEGER
+  * projection_inbound : INTEGER
+  backlog_h1 : INTEGER
+  actual_inbound_h2 : INTEGER
+  actual_inbound_h1 : INTEGER
+  actual_inbound : INTEGER
+  source_file : VARCHAR
+}
+entity Prediction {
+  * pred_id : VARCHAR <<PK>>
+  --
+  * wh_id : VARCHAR <<FK>>
+  actual_input_by : VARCHAR <<FK>>
+  * target_date : DATE
+  * predicted : INTEGER
+  * projection : INTEGER
+  * deviation_pct : DECIMAL
+  * alert : BOOLEAN
+  * status : VARCHAR
+  * data_status : VARCHAR
+  * source : VARCHAR
+  * model_version : VARCHAR
+  * generated_at : TIMESTAMP
+  * feat_day_of_week : SMALLINT
+  * feat_month : SMALLINT
+  * feat_is_campaign : BOOLEAN
+  * feat_is_holiday : BOOLEAN
+  * feat_is_payday : BOOLEAN
+  feat_pickup_request_h1 : INTEGER
+  * feat_projection_inbound : INTEGER
+  feat_backlog_h1 : INTEGER
+  feat_actual_inbound_h2 : INTEGER
+  feat_actual_inbound_h1 : INTEGER
+  * is_backfill : BOOLEAN
+  actual_inbound : INTEGER
+  actual_note : VARCHAR
+  actual_input_at : TIMESTAMP
+  daily_error_pct : DECIMAL
+  * evaluated : BOOLEAN
+}
+entity ManpowerRecommendation {
+  * pred_id : VARCHAR <<PK>> <<FK>>
+  --
+  * rider : INTEGER
+  * driver : INTEGER
+  * op_inbound : INTEGER
+  * op_outbound : INTEGER
+  * snap_capacity_rider : DECIMAL
+  * snap_capacity_driver : DECIMAL
+  * snap_capacity_op_inbound : DECIMAL
+  * snap_capacity_op_outbound : DECIMAL
+  * snap_ratio_rider : DECIMAL
+  * snap_ratio_driver : DECIMAL
+}
+entity PredictionFeatureImportance {
+  * pred_id : VARCHAR <<PK>> <<FK>>
+  * feature_name : VARCHAR <<PK>>
+  --
+  * importance : DECIMAL
+}
+entity OperationalConfig {
+  * wh_id : VARCHAR <<PK>> <<FK>>
+  --
+  * updated_by : VARCHAR <<FK>>
+  * capacity_rider : DECIMAL
+  * capacity_driver : DECIMAL
+  * capacity_op_inbound : DECIMAL
+  * capacity_op_outbound : DECIMAL
+  * ratio_rider : DECIMAL
+  * ratio_driver : DECIMAL
+  * rounding : VARCHAR
+  * updated_at : TIMESTAMP
+}
+entity ConfigHistory {
+  * history_id : VARCHAR <<PK>>
+  --
+  * wh_id : VARCHAR <<FK>>
+  * changed_by : VARCHAR <<FK>>
+  * changed_by_name : VARCHAR
+  * changed_at : TIMESTAMP
+}
+entity ConfigHistoryDetail {
+  * history_id : VARCHAR <<PK>> <<FK>>
+  * field_name : VARCHAR <<PK>>
+  --
+  old_value : DECIMAL
+  * new_value : DECIMAL
+}
+entity DecisionLog {
+  * decision_id : VARCHAR <<PK>>
+  --
+  * pred_id : VARCHAR <<FK>>
+  * wh_id : VARCHAR <<FK>>
+  * decided_by : VARCHAR <<FK>>
+  * decided_by_name : VARCHAR
+  * decision : VARCHAR
+  * rider_final : INTEGER
+  * driver_final : INTEGER
+  * op_inbound_final : INTEGER
+  * op_outbound_final : INTEGER
+  reason : VARCHAR
+  * decided_at : TIMESTAMP
+}
+entity ModelHealth {
+  * wh_id : VARCHAR <<PK>> <<FK>>
+  --
+  * status : VARCHAR
+  * rolling_mae_7d : DECIMAL
+  * baseline_mae : DECIMAL
+  * drift_threshold : DECIMAL
+  * model_version : VARCHAR
+  * mae_validation : DECIMAL
+  * rmse : DECIMAL
+  * r2 : DECIMAL
+  * updated_at : TIMESTAMP
+}
+entity ModelHealthHistory {
+  * history_key : VARCHAR <<PK>>
+  --
+  * wh_id : VARCHAR <<FK>>
+  * date : DATE
+  * rolling_mae_7d : DECIMAL
+  * baseline_mae : DECIMAL
+  * drift_threshold : DECIMAL
+  * status : VARCHAR
+}
+entity BatchLog {
+  * batch_id : VARCHAR <<PK>>
+  --
+  * wh_id : VARCHAR <<FK>>
+  * run_date : DATE
+  * target_date : DATE
+  * started_at : TIMESTAMP
+  finished_at : TIMESTAMP
+  duration_sec : INTEGER
+  * status : VARCHAR
+  * retry_count : SMALLINT
+  * source : VARCHAR
+  message : VARCHAR
+}
+entity DatasetStatus {
+  * wh_id : VARCHAR <<PK>> <<FK>>
+  --
+  * last_import_at : TIMESTAMP
+  * range_start : DATE
+  * range_end : DATE
+  * row_count : INTEGER
+  source_file : VARCHAR
+}
+entity Notification {
+  * notif_id : VARCHAR <<PK>>
+  --
+  * wh_id : VARCHAR <<FK>>
+  * type : VARCHAR
+  * title : VARCHAR
+  * body : VARCHAR
+  * target_date : DATE
+  * created_at : TIMESTAMP
+}
+entity NotificationAudience {
+  * notif_id : VARCHAR <<PK>> <<FK>>
+  * role : VARCHAR <<PK>>
+  --
+}
+entity NotificationRead {
+  * uid : VARCHAR <<PK>> <<FK>>
+  * notif_id : VARCHAR <<PK>> <<FK>>
+  --
+  * read_at : TIMESTAMP
+}
+Warehouse ||--o{ AppUser : menaungi
+Warehouse ||--o{ DailyData : mencatat
+Warehouse ||--o{ Prediction : memiliki
+Warehouse ||--|| OperationalConfig : diatur oleh
+Warehouse ||--o| ModelHealth : dipantau oleh
+Warehouse ||--o{ ModelHealthHistory : merekam
+Warehouse ||--o{ BatchLog : menjalankan
+Warehouse ||--o| DatasetStatus : diringkas oleh
+Warehouse ||--o{ Notification : menerbitkan
+Warehouse ||--o{ ConfigHistory : mengaudit
+Warehouse ||--o{ DecisionLog : mencatat keputusan
+Prediction ||--o| ManpowerRecommendation : menghasilkan
+Prediction ||--o{ PredictionFeatureImportance : dijelaskan oleh
+Prediction ||--o{ DecisionLog : diputuskan melalui
+AppUser ||--o{ DecisionLog : membuat
+AppUser |o--o{ Prediction : menginput actual
+AppUser ||--o{ OperationalConfig : memperbarui
+AppUser ||--o{ ConfigHistory : mengubah
+ConfigHistory ||--|{ ConfigHistoryDetail : terdiri atas
+Notification ||--|{ NotificationAudience : ditujukan ke
+AppUser ||--o{ NotificationRead : membaca
+Notification ||--o{ NotificationRead : dibaca dalam
+@enduml

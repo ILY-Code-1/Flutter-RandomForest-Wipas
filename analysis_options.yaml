@@ -1,0 +1,14 @@
+# Static analysis for wipas_app. See https://dart.dev/lints.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - firebase/rules-tests/node_modules/**
+    - "**/*.g.dart"
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    always_declare_return_types: true
+    avoid_print: true

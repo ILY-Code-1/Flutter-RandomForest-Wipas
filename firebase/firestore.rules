@@ -1,0 +1,126 @@
+rules_version = '2';
+
+// WIPAS security rules. Deny by default; the role comes from users/{uid}.role.
+// The batch script (wipas-research) writes with the Admin SDK, which bypasses
+// these rules, so every server-owned collection is read-only for clients.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function hasRole(roles) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && role() in roles;
+    }
+
+    function isPositiveNumber(v) {
+      return (v is int || v is float) && v > 0;
+    }
+
+    function validCapacity(d) {
+      return isPositiveNumber(d.capacity_rider)
+        && isPositiveNumber(d.capacity_driver)
+        && isPositiveNumber(d.capacity_op_inbound)
+        && isPositiveNumber(d.capacity_op_outbound)
+        && isPositiveNumber(d.ratio_rider)
+        && isPositiveNumber(d.ratio_driver)
+        && math.abs(d.ratio_rider + d.ratio_driver - 1.0) <= 0.001;
+    }
+
+    // ---------------------------------------------------------------- users
+    match /users/{uid} {
+      // Own profile only; accounts and roles are managed in the Firebase Console.
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+
+      match /notification_reads/{notifId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // ---------------------------------------------------------- predictions
+    match /predictions/{predId} {
+      allow read: if signedIn();
+      allow create, delete: if false;
+      // Admin and Supervisor may only fill in the actual_* fields.
+      allow update: if hasRole(['admin', 'supervisor'])
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['actual_inbound', 'actual_note', 'actual_input_by', 'actual_input_at'])
+        && request.resource.data.actual_inbound is int
+        && request.resource.data.actual_inbound >= 0
+        && request.resource.data.actual_input_by == request.auth.uid
+        && (request.resource.data.actual_note == null
+            || (request.resource.data.actual_note is string && request.resource.data.actual_note.size() <= 500));
+    }
+
+    // -------------------------------------------------- operational_configs
+    match /operational_configs/{whId} {
+      allow read: if signedIn();
+      allow create, update: if hasRole(['admin', 'manajer'])
+        && validCapacity(request.resource.data)
+        && request.resource.data.updated_by == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+             'capacity_rider', 'capacity_driver', 'capacity_op_inbound', 'capacity_op_outbound',
+             'ratio_rider', 'ratio_driver', 'rounding', 'updated_by', 'updated_at']);
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------ append-only audit logs
+    match /config_history/{id} {
+      allow read: if hasRole(['admin', 'manajer', 'supervisor']);
+      allow create: if hasRole(['admin', 'manajer'])
+        && request.resource.data.changed_by == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /decision_logs/{id} {
+      allow read: if hasRole(['admin', 'manajer', 'supervisor']);
+      allow create: if hasRole(['admin', 'manajer'])
+        && request.resource.data.decided_by == request.auth.uid
+        && request.resource.data.decision in ['approved', 'adjusted']
+        && (request.resource.data.decision == 'approved'
+            || (request.resource.data.reason is string && request.resource.data.reason.size() > 0));
+      allow update, delete: if false;
+    }
+
+    // -------------------------------------------------------- notifications
+    match /notifications/{id} {
+      allow read: if hasRole(['admin', 'manajer', 'supervisor', 'viewer'])
+        && role() in resource.data.audience_roles;
+      allow write: if false;
+    }
+
+    // ------------------------------------------- script-owned, read-only data
+    match /daily_data/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /model_health/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /model_health_history/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /batch_logs/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /dataset_status/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /warehouses/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+  }
+}

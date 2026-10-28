@@ -1,0 +1,73 @@
+@startuml use_case
+left to right direction
+skinparam nodesep 12
+skinparam ranksep 90
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+
+' Abstract actor: any signed-in role (generalized by the four roles below).
+actor "Pengguna" as Pengguna
+
+actor "Admin\n(Shift Lead)" as Admin
+actor "Manajer" as Manajer
+actor "Supervisor" as Supervisor
+actor "Viewer\n(Tim DI)" as Viewer
+actor "Script Batch\nPrediksi (Python)" as Script
+
+rectangle "Aplikasi WIPAS (wipas-app)" {
+  usecase "UC01 Login" as UC01
+  usecase "UC02 Reset Kata Sandi" as UC02
+  usecase "UC03 Melihat Beranda" as UC03
+  usecase "UC04 Melihat Prediksi H+1/H+2" as UC04
+  usecase "UC05 Melihat Rekomendasi Manpower" as UC05
+  usecase "UC06 Menyetujui Rekomendasi" as UC06
+  usecase "UC07 Menyesuaikan Manpower Manual" as UC07
+  usecase "UC08 Melihat Evaluasi Model" as UC08
+  usecase "UC09 Input Actual Inbound" as UC09
+  usecase "UC10 Mengatur Konfigurasi Kapasitas" as UC10
+  usecase "UC11 Melihat Riwayat dan Log Keputusan" as UC11
+  usecase "UC12 Export CSV Riwayat" as UC12
+  usecase "UC13 Mengelola Notifikasi" as UC13
+  usecase "UC14 Melihat Profil dan Keluar" as UC14
+  usecase "UC15 Menjalankan Batch Prediksi" as UC15
+}
+
+' Common to all four roles (generalization keeps the diagram readable).
+Admin --|> Pengguna
+Manajer --|> Pengguna
+Supervisor --|> Pengguna
+Viewer --|> Pengguna
+
+Pengguna -- UC01
+Pengguna -- UC02
+Pengguna -- UC03
+Pengguna -- UC04
+Pengguna -- UC11
+Pengguna -- UC13
+Pengguna -- UC14
+
+' Role-specific rights (AccessMatrix).
+Admin -- UC05
+Admin -- UC06
+Admin -- UC07
+Admin -- UC08
+Admin -- UC09
+Admin -- UC10
+Admin -- UC12
+Manajer -- UC05
+Manajer -- UC06
+Manajer -- UC07
+Manajer -- UC08
+Manajer -- UC10
+Supervisor -- UC05
+Supervisor -- UC09
+Viewer -- UC08
+
+UC15 -- Script
+
+UC06 .> UC05 : <<extend>>
+UC07 .> UC05 : <<extend>>
+UC12 .> UC11 : <<extend>>
+@enduml

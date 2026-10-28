@@ -1,0 +1,10 @@
+@startuml wb_01_mp_flowchart
+start
+:p = predicted.toDouble();
+:rider = _ceil(p × ratioRider / capacityRider)
+driver = _ceil(p × ratioDriver / capacityDriver)
+opInbound = _ceil(p / capacityOpInbound)
+opOutbound = _ceil(p / capacityOpOutbound);
+:return ManpowerCounts;
+stop
+@enduml

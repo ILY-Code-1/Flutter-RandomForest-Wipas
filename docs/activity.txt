@@ -1,0 +1,274 @@
+' == Activity: UC01 Login ==
+@startuml act_UC01
+|Pengguna|
+start
+:Buka aplikasi (Splash);
+:Isi email dan password;
+|Aplikasi WIPAS|
+:Periksa akun dan role;
+if (Akun valid dan punya role?) then (ya)
+  :Catat awal sesi (24 jam);
+  :Tampilkan Beranda sesuai role;
+else (tidak)
+  :Tampilkan "Email atau password salah";
+endif
+stop
+@enduml
+
+' == Activity: UC02 Reset Kata Sandi ==
+@startuml act_UC02
+|Pengguna|
+start
+:Pilih "Lupa password?";
+:Isi email akun;
+|Aplikasi WIPAS|
+if (Format email valid?) then (ya)
+  :Minta Firebase kirim tautan reset;
+  :Tampilkan konfirmasi tautan terkirim;
+else (tidak)
+  :Tampilkan pesan email tidak valid;
+endif
+|Pengguna|
+:Kembali ke halaman masuk;
+stop
+@enduml
+
+' == Activity: UC03 Melihat Beranda ==
+@startuml act_UC03
+|Pengguna|
+start
+:Buka tab Beranda;
+|Aplikasi WIPAS|
+:Muat prediksi H+1 dan kesehatan model;
+if (Data tersedia?) then (ya)
+  if (Deviasi > 15% atau model degraded?) then (ya)
+    :Tampilkan banner peringatan;
+  endif
+  :Tampilkan KPI, tren 14 hari, dan kartu sesuai role;
+else (tidak)
+  :Tampilkan "Belum ada data batch";
+endif
+|Pengguna|
+:Pilih tanggal lain atau buka menu terkait;
+stop
+@enduml
+
+' == Activity: UC04 Melihat Prediksi H+1/H+2 ==
+@startuml act_UC04
+|Pengguna|
+start
+:Buka tab Prediksi;
+:Pilih H+1 atau H+2;
+|Aplikasi WIPAS|
+if (Prediksi tanggal itu ada?) then (ya)
+  :Tampilkan target, status data, dan deviasi;
+  :Tampilkan tabel atau grafik riwayat;
+  if (Role bukan Supervisor?) then (ya)
+    :Tampilkan faktor pendorong;
+  endif
+else (tidak)
+  :Tampilkan kosong + "Kembali ke H+1";
+endif
+stop
+@enduml
+
+' == Activity: UC05 Melihat Rekomendasi Manpower ==
+@startuml act_UC05
+|Pengguna|
+start
+:Buka tab Manpower;
+|Aplikasi WIPAS|
+:Muat rekomendasi, kapasitas, dan log keputusan;
+:Tampilkan 4 kategori dan status keputusan;
+|Pengguna|
+if (Ingin melihat rumus?) then (ya)
+  :Buka "Cara hitung" kategori;
+  |Aplikasi WIPAS|
+  :Tampilkan rumus dan substitusi angka;
+endif
+stop
+@enduml
+
+' == Activity: UC06 Menyetujui Rekomendasi ==
+@startuml act_UC06
+|Admin/Manajer|
+start
+:Buka Rekomendasi Manpower;
+|Aplikasi WIPAS|
+if (Sedang online?) then (ya)
+  |Admin/Manajer|
+  :Tekan "Setujui rekomendasi";
+  if (Konfirmasi di dialog?) then (Setujui)
+    |Aplikasi WIPAS|
+    :Catat keputusan "approved" ke log;
+    :Tampilkan status Disetujui;
+  else (Batal)
+  endif
+else (tidak)
+  :Nonaktifkan tombol ("Tidak tersedia saat offline");
+endif
+stop
+@enduml
+
+' == Activity: UC07 Menyesuaikan Manpower Manual ==
+@startuml act_UC07
+|Admin/Manajer|
+start
+:Tekan "Sesuaikan manual";
+:Ubah jumlah per kategori;
+:Isi alasan penyesuaian;
+|Aplikasi WIPAS|
+if (Alasan diisi?) then (ya)
+  :Catat keputusan "adjusted" ke log;
+  :Tampilkan status Disesuaikan manual;
+else (tidak)
+  :Tampilkan "Alasan wajib diisi.";
+endif
+stop
+@enduml
+
+' == Activity: UC08 Melihat Evaluasi Model ==
+@startuml act_UC08
+|Pengguna|
+start
+:Buka tab Evaluasi;
+|Aplikasi WIPAS|
+:Tampilkan kesehatan model dan grafik Rolling MAE;
+:Tampilkan metrik validasi dan evaluasi Projection;
+:Tampilkan status batch dan dataset;
+if (Model Degraded?) then (ya)
+  :Tampilkan saran review & retraining manual;
+  |Pengguna|
+  :Buka feature importance di Prediksi;
+endif
+stop
+@enduml
+
+' == Activity: UC09 Input Actual Inbound ==
+@startuml act_UC09
+|Admin/Supervisor|
+start
+:Buka Input Actual;
+:Pilih tanggal dan isi angka actual;
+|Aplikasi WIPAS|
+if (Angka bulat dan tidak negatif?) then (ya)
+  :Tampilkan perbandingan dan dampak Rolling MAE;
+  |Admin/Supervisor|
+  :Tekan Simpan;
+  |Aplikasi WIPAS|
+  :Simpan actual ke dokumen prediksi;
+  :Tampilkan SnackBar sukses;
+else (tidak)
+  :Tampilkan pesan galat (kosong/negatif);
+endif
+stop
+@enduml
+
+' == Activity: UC10 Mengatur Konfigurasi Kapasitas ==
+@startuml act_UC10
+|Admin/Manajer|
+start
+:Buka Konfigurasi Kapasitas;
+:Ubah kapasitas dan rasio;
+|Aplikasi WIPAS|
+if (Kapasitas > 0 dan rasio = 1,00?) then (ya)
+  :Tampilkan pratinjau dampak manpower;
+  |Admin/Manajer|
+  :Simpan dan konfirmasi di dialog;
+  |Aplikasi WIPAS|
+  :Simpan konfigurasi dan riwayat perubahan;
+else (tidak)
+  :Tampilkan galat dan nonaktifkan Simpan;
+endif
+stop
+@enduml
+
+' == Activity: UC11 Melihat Riwayat dan Log Keputusan ==
+@startuml act_UC11
+|Pengguna|
+start
+:Buka Lainnya lalu Riwayat;
+:Pilih 7 hari, 14 hari, atau rentang tanggal;
+|Aplikasi WIPAS|
+:Muat prediksi dan actual pada rentang;
+if (Role Viewer?) then (ya)
+  :Sembunyikan kolom keputusan;
+else (tidak)
+  :Tampilkan status keputusan per hari;
+endif
+:Tandai hari dengan deviasi > 15%;
+stop
+@enduml
+
+' == Activity: UC12 Export CSV Riwayat ==
+@startuml act_UC12
+|Admin|
+start
+:Tekan "Export CSV" di Riwayat;
+|Aplikasi WIPAS|
+:Tampilkan status menyiapkan;
+:Susun berkas CSV (BOM UTF-8, koma);
+if (Berkas tersimpan?) then (ya)
+  :Tampilkan "File siap diunduh";
+  |Admin|
+  :Bagikan berkas;
+else (tidak)
+  |Aplikasi WIPAS|
+  :Tampilkan "Export gagal" + Coba lagi;
+endif
+stop
+@enduml
+
+' == Activity: UC13 Mengelola Notifikasi ==
+@startuml act_UC13
+|Pengguna|
+start
+:Tekan lonceng notifikasi;
+|Aplikasi WIPAS|
+:Tampilkan notifikasi untuk role pengguna;
+|Pengguna|
+if (Aksi yang dipilih?) then (filter)
+  :Pilih chip filter;
+elseif (Aksi yang dipilih?) then (tandai semua)
+  :Tekan "Tandai semua dibaca";
+else (buka)
+  :Ketuk notifikasi;
+  |Aplikasi WIPAS|
+  :Tandai dibaca dan buka layar terkait;
+endif
+stop
+@enduml
+
+' == Activity: UC14 Melihat Profil dan Keluar ==
+@startuml act_UC14
+|Pengguna|
+start
+:Buka Lainnya lalu Profil & pengaturan;
+|Aplikasi WIPAS|
+:Tampilkan info akun dan versi;
+|Pengguna|
+:Tekan Keluar;
+if (Konfirmasi di dialog?) then (Keluar)
+  |Aplikasi WIPAS|
+  :Akhiri sesi;
+  :Tampilkan halaman Login;
+else (Batal)
+endif
+stop
+@enduml
+
+' == Activity: UC15 Menjalankan Batch Prediksi ==
+@startuml act_UC15
+|Script Batch Prediksi|
+start
+:Impor data Excel terbaru;
+if (Actual H-1 tersedia?) then (ya)
+  :Siapkan fitur dengan data H-1;
+else (tidak)
+  :Pakai actual H-2 (fallback) dan tandai incomplete;
+endif
+:Hitung prediksi H+1 dan rekomendasi manpower;
+:Tulis prediksi dan kesehatan model ke Firestore;
+:Tulis log batch dan notifikasi;
+stop
+@enduml

@@ -1,0 +1,17 @@
+@startuml wb_08_vs_flowchart
+start
+if (value.hasValue?) then (ya)
+  if (isEmpty != null dan isEmpty(data)?) then (ya)
+    :return ViewEmpty;
+  elseif (offline?) then (ya)
+    :return ViewOffline(data, lastSync);
+  else (tidak)
+    :return ViewData(data);
+  endif
+elseif (value.hasError?) then (ya)
+  :return ViewError;
+else (tidak)
+  :return ViewLoading;
+endif
+stop
+@enduml

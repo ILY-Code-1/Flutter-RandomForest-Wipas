@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desain Basis Data WIPAS — v2 (Relasional Konseptual)</title><style>
+body{font-family:Inter,Segoe UI,Arial,sans-serif;color:#1B2433;background:#fff;margin:0 auto;max-width:1100px;padding:24px;line-height:1.5}
+h1{color:#1F3A5F;font-size:26px;margin-bottom:4px}h2{color:#1F3A5F;border-bottom:2px solid #DDE3EC;padding-bottom:4px;margin-top:36px}
+h3{color:#1F3A5F;margin-top:24px}.sub{color:#5B6779;margin-top:0}
+.note{background:#E3F0FC;border:1px solid #90CAF9;border-radius:10px;padding:12px 16px;color:#0D3A73}
+.warn{background:#FFF4D6;border:1px solid #F9A825;border-radius:10px;padding:12px 16px;color:#7A4F00}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0 16px}
+th,td{border:1px solid #DDE3EC;padding:5px 7px;vertical-align:top;text-align:left}
+th{background:#1F3A5F;color:#fff}tr:nth-child(even) td{background:#F5F7FA}
+code{background:#EEF1F6;padding:1px 4px;border-radius:4px;font-size:12px}
+pre.plantuml{background:#1B2433;color:#E3F0FC;padding:12px;border-radius:10px;overflow-x:auto;font-size:12px}
+ul.tree{font-family:Consolas,monospace;font-size:13px}ul.tree li{margin:2px 0}
+img.diagram{max-width:100%;border:1px solid #DDE3EC;border-radius:8px;margin:8px 0}
+@media print{pre.plantuml{white-space:pre-wrap;color:#000;background:#fff;border:1px solid #999}h2{page-break-after:avoid}table{page-break-inside:auto}}
+</style></head>
+<body><h1>Desain Basis Data WIPAS — v2 (Relasional Konseptual)</h1><p class="sub">ERD, transformasi ke LRS, LRS final, dan spesifikasi tabel.</p>
+<div class="warn"><b>Catatan:</b> dokumen ini adalah <b>desain relasional konseptual</b> untuk keperluan analisis dan bab skripsi. Implementasi aplikasi memakai <b>Cloud Firestore (NoSQL)</b> seperti pada <a href="database_design.html">database_design.html</a>. Nama entitas, tabel, dan atribut di bawah identik di ERD, transformasi, LRS final, dan spesifikasi.</div>
+<h3>Pemetaan koleksi Firestore → tabel relasional</h3><table><tr><th>Tabel</th><th>Sumber Firestore</th><th>Keterangan</th></tr>
+<tr><td><b>Warehouse</b></td><td><code>warehouses</code></td><td>Master gudang</td></tr>
+<tr><td><b>AppUser</b></td><td><code>users</code></td><td>Pengguna aplikasi</td></tr>
+<tr><td><b>DailyData</b></td><td><code>daily_data</code></td><td>Data harian hasil impor Excel</td></tr>
+<tr><td><b>Prediction</b></td><td><code>predictions</code></td><td>Prediksi inbound H+1</td></tr>
+<tr><td><b>ManpowerRecommendation</b></td><td><code>predictions.manpower</code></td><td>Rekomendasi manpower per prediksi (1:1)</td></tr>
+<tr><td><b>PredictionFeatureImportance</b></td><td><code>predictions.feature_importance</code></td><td>Bobot fitur per prediksi (atribut multinilai)</td></tr>
+<tr><td><b>OperationalConfig</b></td><td><code>operational_configs</code></td><td>Konfigurasi kapasitas aktif per gudang</td></tr>
+<tr><td><b>ConfigHistory</b></td><td><code>config_history</code></td><td>Header audit trail konfigurasi</td></tr>
+<tr><td><b>ConfigHistoryDetail</b></td><td><code>config_history.old_values/new_values</code></td><td>Nilai lama → baru per parameter (weak entity)</td></tr>
+<tr><td><b>DecisionLog</b></td><td><code>decision_logs</code></td><td>Keputusan manpower (append-only)</td></tr>
+<tr><td><b>ModelHealth</b></td><td><code>model_health</code></td><td>Kesehatan model terkini per gudang</td></tr>
+<tr><td><b>ModelHealthHistory</b></td><td><code>model_health_history</code></td><td>Riwayat Rolling MAE harian</td></tr>
+<tr><td><b>BatchLog</b></td><td><code>batch_logs</code></td><td>Log eksekusi batch</td></tr>
+<tr><td><b>DatasetStatus</b></td><td><code>dataset_status</code></td><td>Ringkasan dataset per gudang</td></tr>
+<tr><td><b>Notification</b></td><td><code>notifications</code></td><td>Notifikasi dalam aplikasi</td></tr>
+<tr><td><b>NotificationAudience</b></td><td><code>notifications.audience_roles</code></td><td>Role penerima notifikasi (atribut multinilai)</td></tr>
+<tr><td><b>NotificationRead</b></td><td><code>users/{uid}/notification_reads</code></td><td>Junction M:N AppUser–Notification</td></tr>
+</table>
+<h2>1. Entity Relationship Diagram (crow's foot)</h2>
+<p>Pusat model adalah <b>Warehouse</b>: setiap data operasional terikat ke satu gudang. <b>Prediction</b> dihasilkan script per tanggal dan menjadi induk <b>ManpowerRecommendation</b> (1:0..1), <b>PredictionFeatureImportance</b>, dan <b>DecisionLog</b>. <b>AppUser</b> membuat keputusan, menginput actual, mengubah konfigurasi, dan membaca notifikasi (M:N lewat <b>NotificationRead</b>). Atribut bertanda <code>*</code> wajib; <code>&lt;&lt;PK&gt;&gt;</code> kunci primer; <code>&lt;&lt;FK&gt;&gt;</code> kunci asing. Catatan: <code>model_health.feature_importance</code> tidak dibuat tabel tersendiri karena sama dengan bobot pada prediksi terbaru (turunan); tidak ada tabel versi model karena <code>model_version</code> hanya berupa label teks di skema.</p>
+<pre class="plantuml">@startuml erd
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide circle
+skinparam linetype ortho
+left to right direction
+entity Warehouse {
+  * wh_id : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * name : VARCHAR
+  city : VARCHAR
+}
+entity AppUser {
+  * uid : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * wh_id : VARCHAR &lt;&lt;FK&gt;&gt;
+  * display_name : VARCHAR
+  * email : VARCHAR
+  * role : VARCHAR
+  job_title : VARCHAR
+}
+entity DailyData {
+  * daily_id : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * wh_id : VARCHAR &lt;&lt;FK&gt;&gt;
+  * date : DATE
+  * day_of_week : SMALLINT
+  * month : SMALLINT
+  * is_campaign : BOOLEAN
+  * is_holiday : BOOLEAN
+  * is_payday : BOOLEAN
+  pickup_request_h1 : INTEGER
+  * projection_inbound : INTEGER
+  backlog_h1 : INTEGER
+  actual_inbound_h2 : INTEGER
+  actual_inbound_h1 : INTEGER
+  actual_inbound : INTEGER
+  source_file : VARCHAR
+}
+entity Prediction {
+  * pred_id : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * wh_id : VARCHAR &lt;&lt;FK&gt;&gt;
+  actual_input_by : VARCHAR &lt;&lt;FK&gt;&gt;
+  * target_date : DATE
+  * predicted : INTEGER
+  * projection : INTEGER
+  * deviation_pct : DECIMAL
+  * alert : BOOLEAN
+  * status : VARCHAR
+  * data_status : VARCHAR
+  * source : VARCHAR
+  * model_version : VARCHAR
+  * generated_at : TIMESTAMP
+  * feat_day_of_week : SMALLINT
+  * feat_month : SMALLINT
+  * feat_is_campaign : BOOLEAN
+  * feat_is_holiday : BOOLEAN
+  * feat_is_payday : BOOLEAN
+  feat_pickup_request_h1 : INTEGER
+  * feat_projection_inbound : INTEGER
+  feat_backlog_h1 : INTEGER
+  feat_actual_inbound_h2 : INTEGER
+  feat_actual_inbound_h1 : INTEGER
+  * is_backfill : BOOLEAN
+  actual_inbound : INTEGER
+  actual_note : VARCHAR
+  actual_input_at : TIMESTAMP
+  daily_error_pct : DECIMAL
+  * evaluated : BOOLEAN
+}
+entity ManpowerRecommendation {
+  * pred_id : VARCHAR &lt;&lt;PK&gt;&gt; &lt;&lt;FK&gt;&gt;
+  --
+  * rider : INTEGER
+  * driver : INTEGER
+  * op_inbound : INTEGER
+  * op_outbound : INTEGER
+  * snap_capacity_rider : DECIMAL
+  * snap_capacity_driver : DECIMAL
+  * snap_capacity_op_inbound : DECIMAL
+  * snap_capacity_op_outbound : DECIMAL
+  * snap_ratio_rider : DECIMAL
+  * snap_ratio_driver : DECIMAL
+}
+entity PredictionFeatureImportance {
+  * pred_id : VARCHAR &lt;&lt;PK&gt;&gt; &lt;&lt;FK&gt;&gt;
+  * feature_name : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * importance : DECIMAL
+}
+entity OperationalConfig {
+  * wh_id : VARCHAR &lt;&lt;PK&gt;&gt; &lt;&lt;FK&gt;&gt;
+  --
+  * updated_by : VARCHAR &lt;&lt;FK&gt;&gt;
+  * capacity_rider : DECIMAL
+  * capacity_driver : DECIMAL
+  * capacity_op_inbound : DECIMAL
+  * capacity_op_outbound : DECIMAL
+  * ratio_rider : DECIMAL
+  * ratio_driver : DECIMAL
+  * rounding : VARCHAR
+  * updated_at : TIMESTAMP
+}
+entity ConfigHistory {
+  * history_id : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * wh_id : VARCHAR &lt;&lt;FK&gt;&gt;
+  * changed_by : VARCHAR &lt;&lt;FK&gt;&gt;
+  * changed_by_name : VARCHAR
+  * changed_at : TIMESTAMP
+}
+entity ConfigHistoryDetail {
+  * history_id : VARCHAR &lt;&lt;PK&gt;&gt; &lt;&lt;FK&gt;&gt;
+  * field_name : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  old_value : DECIMAL
+  * new_value : DECIMAL
+}
+entity DecisionLog {
+  * decision_id : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * pred_id : VARCHAR &lt;&lt;FK&gt;&gt;
+  * wh_id : VARCHAR &lt;&lt;FK&gt;&gt;
+  * decided_by : VARCHAR &lt;&lt;FK&gt;&gt;
+  * decided_by_name : VARCHAR
+  * decision : VARCHAR
+  * rider_final : INTEGER
+  * driver_final : INTEGER
+  * op_inbound_final : INTEGER
+  * op_outbound_final : INTEGER
+  reason : VARCHAR
+  * decided_at : TIMESTAMP
+}
+entity ModelHealth {
+  * wh_id : VARCHAR &lt;&lt;PK&gt;&gt; &lt;&lt;FK&gt;&gt;
+  --
+  * status : VARCHAR
+  * rolling_mae_7d : DECIMAL
+  * baseline_mae : DECIMAL
+  * drift_threshold : DECIMAL
+  * model_version : VARCHAR
+  * mae_validation : DECIMAL
+  * rmse : DECIMAL
+  * r2 : DECIMAL
+  * updated_at : TIMESTAMP
+}
+entity ModelHealthHistory {
+  * history_key : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * wh_id : VARCHAR &lt;&lt;FK&gt;&gt;
+  * date : DATE
+  * rolling_mae_7d : DECIMAL
+  * baseline_mae : DECIMAL
+  * drift_threshold : DECIMAL
+  * status : VARCHAR
+}
+entity BatchLog {
+  * batch_id : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * wh_id : VARCHAR &lt;&lt;FK&gt;&gt;
+  * run_date : DATE
+  * target_date : DATE
+  * started_at : TIMESTAMP
+  finished_at : TIMESTAMP
+  duration_sec : INTEGER
+  * status : VARCHAR
+  * retry_count : SMALLINT
+  * source : VARCHAR
+  message : VARCHAR
+}
+entity DatasetStatus {
+  * wh_id : VARCHAR &lt;&lt;PK&gt;&gt; &lt;&lt;FK&gt;&gt;
+  --
+  * last_import_at : TIMESTAMP
+  * range_start : DATE
+  * range_end : DATE
+  * row_count : INTEGER
+  source_file : VARCHAR
+}
+entity Notification {
+  * notif_id : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+  * wh_id : VARCHAR &lt;&lt;FK&gt;&gt;
+  * type : VARCHAR
+  * title : VARCHAR
+  * body : VARCHAR
+  * target_date : DATE
+  * created_at : TIMESTAMP
+}
+entity NotificationAudience {
+  * notif_id : VARCHAR &lt;&lt;PK&gt;&gt; &lt;&lt;FK&gt;&gt;
+  * role : VARCHAR &lt;&lt;PK&gt;&gt;
+  --
+}
+entity NotificationRead {
+  * uid : VARCHAR &lt;&lt;PK&gt;&gt; &lt;&lt;FK&gt;&gt;
+  * notif_id : VARCHAR &lt;&lt;PK&gt;&gt; &lt;&lt;FK&gt;&gt;
+  --
+  * read_at : TIMESTAMP
+}
+Warehouse ||--o{ AppUser : menaungi
+Warehouse ||--o{ DailyData : mencatat
+Warehouse ||--o{ Prediction : memiliki
+Warehouse ||--|| OperationalConfig : diatur oleh
+Warehouse ||--o| ModelHealth : dipantau oleh
+Warehouse ||--o{ ModelHealthHistory : merekam
+Warehouse ||--o{ BatchLog : menjalankan
+Warehouse ||--o| DatasetStatus : diringkas oleh
+Warehouse ||--o{ Notification : menerbitkan
+Warehouse ||--o{ ConfigHistory : mengaudit
+Warehouse ||--o{ DecisionLog : mencatat keputusan
+Prediction ||--o| ManpowerRecommendation : menghasilkan
+Prediction ||--o{ PredictionFeatureImportance : dijelaskan oleh
+Prediction ||--o{ DecisionLog : diputuskan melalui
+AppUser ||--o{ DecisionLog : membuat
+AppUser |o--o{ Prediction : menginput actual
+AppUser ||--o{ OperationalConfig : memperbarui
+AppUser ||--o{ ConfigHistory : mengubah
+ConfigHistory ||--|{ ConfigHistoryDetail : terdiri atas
+Notification ||--|{ NotificationAudience : ditujukan ke
+AppUser ||--o{ NotificationRead : membaca
+Notification ||--o{ NotificationRead : dibaca dalam
+@enduml</pre>
+<p><img class="diagram" src="img/erd.png" alt="erd"></p>
+<h2>2. Transformasi ERD ke LRS</h2>
+<table><tr><th>Kasus</th><th>Keputusan transformasi</th><th>Tabel hasil</th></tr>
+<tr><td>1:1 Warehouse–OperationalConfig, Warehouse–ModelHealth, Warehouse–DatasetStatus</td><td>PK tabel anak = FK <code>wh_id</code> (sesuai ID dokumen <code>{wh}</code>).</td><td>OperationalConfig, ModelHealth, DatasetStatus</td></tr>
+<tr><td>1:0..1 Prediction–ManpowerRecommendation (embed <code>manpower</code>)</td><td>Dipisah menjadi tabel dengan PK sekaligus FK <code>pred_id</code>; <code>config_snapshot</code> diratakan menjadi kolom <code>snap_*</code>.</td><td>ManpowerRecommendation</td></tr>
+<tr><td>1:N di sisi many</td><td>FK diletakkan di tabel sisi many: <code>wh_id</code>, <code>pred_id</code>, <code>decided_by</code>, <code>changed_by</code>, <code>updated_by</code>, <code>actual_input_by</code> (opsional).</td><td>AppUser, DailyData, Prediction, DecisionLog, ConfigHistory, BatchLog, ModelHealthHistory, Notification</td></tr>
+<tr><td>Atribut multinilai <code>feature_importance</code></td><td>Tabel terpisah, PK komposit (<code>pred_id</code>, <code>feature_name</code>).</td><td>PredictionFeatureImportance</td></tr>
+<tr><td>Atribut multinilai <code>audience_roles</code></td><td>Tabel terpisah, PK komposit (<code>notif_id</code>, <code>role</code>).</td><td>NotificationAudience</td></tr>
+<tr><td>Weak entity: <code>old_values</code>/<code>new_values</code> pada riwayat konfigurasi</td><td>Satu baris per parameter yang berubah, PK komposit (<code>history_id</code>, <code>field_name</code>).</td><td>ConfigHistoryDetail</td></tr>
+<tr><td>M:N AppUser–Notification (status baca)</td><td>Tabel junction dengan PK komposit (<code>uid</code>, <code>notif_id</code>) + <code>read_at</code>.</td><td>NotificationRead</td></tr>
+<tr><td>Map <code>input_features</code> (1:1, ukuran tetap)</td><td>Diratakan menjadi kolom <code>feat_*</code> di Prediction (tidak perlu tabel).</td><td>Prediction</td></tr>
+<tr><td>Map <code>manpower_final</code> pada keputusan</td><td>Diratakan menjadi <code>*_final</code>.</td><td>DecisionLog</td></tr>
+</table>
+<p>Notasi: <code>+</code> PK, <code>#</code> FK, <code>-</code> atribut; <code>{FK}</code> pada PK menandai PK yang juga FK.</p>
+<pre class="plantuml">@startuml lrs_transformasi
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide circle
+hide methods
+skinparam linetype ortho
+left to right direction
+class Warehouse &lt;&lt;Table&gt;&gt; {
+  + wh_id : VARCHAR
+  - name : VARCHAR
+  - city : VARCHAR
+}
+class AppUser &lt;&lt;Table&gt;&gt; {
+  + uid : VARCHAR
+  # wh_id : VARCHAR
+  - display_name : VARCHAR
+  - email : VARCHAR
+  - role : VARCHAR
+  - job_title : VARCHAR
+}
+class DailyData &lt;&lt;Table&gt;&gt; {
+  + daily_id : VARCHAR
+  # wh_id : VARCHAR
+  - date : DATE
+  - day_of_week : SMALLINT
+  - month : SMALLINT
+  - is_campaign : BOOLEAN
+  - is_holiday : BOOLEAN
+  - is_payday : BOOLEAN
+  - pickup_request_h1 : INTEGER
+  - projection_inbound : INTEGER
+  - backlog_h1 : INTEGER
+  - actual_inbound_h2 : INTEGER
+  - actual_inbound_h1 : INTEGER
+  - actual_inbound : INTEGER
+  - source_file : VARCHAR
+}
+class Prediction &lt;&lt;Table&gt;&gt; {
+  + pred_id : VARCHAR
+  # wh_id : VARCHAR
+  # actual_input_by : VARCHAR
+  - target_date : DATE
+  - predicted : INTEGER
+  - projection : INTEGER
+  - deviation_pct : DECIMAL
+  - alert : BOOLEAN
+  - status : VARCHAR
+  - data_status : VARCHAR
+  - source : VARCHAR
+  - model_version : VARCHAR
+  - generated_at : TIMESTAMP
+  - feat_day_of_week : SMALLINT
+  - feat_month : SMALLINT
+  - feat_is_campaign : BOOLEAN
+  - feat_is_holiday : BOOLEAN
+  - feat_is_payday : BOOLEAN
+  - feat_pickup_request_h1 : INTEGER
+  - feat_projection_inbound : INTEGER
+  - feat_backlog_h1 : INTEGER
+  - feat_actual_inbound_h2 : INTEGER
+  - feat_actual_inbound_h1 : INTEGER
+  - is_backfill : BOOLEAN
+  - actual_inbound : INTEGER
+  - actual_note : VARCHAR
+  - actual_input_at : TIMESTAMP
+  - daily_error_pct : DECIMAL
+  - evaluated : BOOLEAN
+}
+class ManpowerRecommendation &lt;&lt;Table&gt;&gt; {
+  + pred_id : VARCHAR {FK}
+  - rider : INTEGER
+  - driver : INTEGER
+  - op_inbound : INTEGER
+  - op_outbound : INTEGER
+  - snap_capacity_rider : DECIMAL
+  - snap_capacity_driver : DECIMAL
+  - snap_capacity_op_inbound : DECIMAL
+  - snap_capacity_op_outbound : DECIMAL
+  - snap_ratio_rider : DECIMAL
+  - snap_ratio_driver : DECIMAL
+}
+class PredictionFeatureImportance &lt;&lt;Table&gt;&gt; {
+  + pred_id : VARCHAR {FK}
+  + feature_name : VARCHAR
+  - importance : DECIMAL
+}
+class OperationalConfig &lt;&lt;Table&gt;&gt; {
+  + wh_id : VARCHAR {FK}
+  # updated_by : VARCHAR
+  - capacity_rider : DECIMAL
+  - capacity_driver : DECIMAL
+  - capacity_op_inbound : DECIMAL
+  - capacity_op_outbound : DECIMAL
+  - ratio_rider : DECIMAL
+  - ratio_driver : DECIMAL
+  - rounding : VARCHAR
+  - updated_at : TIMESTAMP
+}
+class ConfigHistory &lt;&lt;Table&gt;&gt; {
+  + history_id : VARCHAR
+  # wh_id : VARCHAR
+  # changed_by : VARCHAR
+  - changed_by_name : VARCHAR
+  - changed_at : TIMESTAMP
+}
+class ConfigHistoryDetail &lt;&lt;Table&gt;&gt; {
+  + history_id : VARCHAR {FK}
+  + field_name : VARCHAR
+  - old_value : DECIMAL
+  - new_value : DECIMAL
+}
+class DecisionLog &lt;&lt;Table&gt;&gt; {
+  + decision_id : VARCHAR
+  # pred_id : VARCHAR
+  # wh_id : VARCHAR
+  # decided_by : VARCHAR
+  - decided_by_name : VARCHAR
+  - decision : VARCHAR
+  - rider_final : INTEGER
+  - driver_final : INTEGER
+  - op_inbound_final : INTEGER
+  - op_outbound_final : INTEGER
+  - reason : VARCHAR
+  - decided_at : TIMESTAMP
+}
+class ModelHealth &lt;&lt;Table&gt;&gt; {
+  + wh_id : VARCHAR {FK}
+  - status : VARCHAR
+  - rolling_mae_7d : DECIMAL
+  - baseline_mae : DECIMAL
+  - drift_threshold : DECIMAL
+  - model_version : VARCHAR
+  - mae_validation : DECIMAL
+  - rmse : DECIMAL
+  - r2 : DECIMAL
+  - updated_at : TIMESTAMP
+}
+class ModelHealthHistory &lt;&lt;Table&gt;&gt; {
+  + history_key : VARCHAR
+  # wh_id : VARCHAR
+  - date : DATE
+  - rolling_mae_7d : DECIMAL
+  - baseline_mae : DECIMAL
+  - drift_threshold : DECIMAL
+  - status : VARCHAR
+}
+class BatchLog &lt;&lt;Table&gt;&gt; {
+  + batch_id : VARCHAR
+  # wh_id : VARCHAR
+  - run_date : DATE
+  - target_date : DATE
+  - started_at : TIMESTAMP
+  - finished_at : TIMESTAMP
+  - duration_sec : INTEGER
+  - status : VARCHAR
+  - retry_count : SMALLINT
+  - source : VARCHAR
+  - message : VARCHAR
+}
+class DatasetStatus &lt;&lt;Table&gt;&gt; {
+  + wh_id : VARCHAR {FK}
+  - last_import_at : TIMESTAMP
+  - range_start : DATE
+  - range_end : DATE
+  - row_count : INTEGER
+  - source_file : VARCHAR
+}
+class Notification &lt;&lt;Table&gt;&gt; {
+  + notif_id : VARCHAR
+  # wh_id : VARCHAR
+  - type : VARCHAR
+  - title : VARCHAR
+  - body : VARCHAR
+  - target_date : DATE
+  - created_at : TIMESTAMP
+}
+class NotificationAudience &lt;&lt;Table&gt;&gt; {
+  + notif_id : VARCHAR {FK}
+  + role : VARCHAR
+}
+class NotificationRead &lt;&lt;Table&gt;&gt; {
+  + uid : VARCHAR {FK}
+  + notif_id : VARCHAR {FK}
+  - read_at : TIMESTAMP
+}
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; AppUser : menaungi
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; DailyData : mencatat
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; Prediction : memiliki
+Warehouse &quot;1&quot; --&gt; &quot;1&quot; OperationalConfig : diatur oleh
+Warehouse &quot;1&quot; --&gt; &quot;0..1&quot; ModelHealth : dipantau oleh
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; ModelHealthHistory : merekam
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; BatchLog : menjalankan
+Warehouse &quot;1&quot; --&gt; &quot;0..1&quot; DatasetStatus : diringkas oleh
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; Notification : menerbitkan
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; ConfigHistory : mengaudit
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; DecisionLog : mencatat keputusan
+Prediction &quot;1&quot; --&gt; &quot;0..1&quot; ManpowerRecommendation : menghasilkan
+Prediction &quot;1&quot; --&gt; &quot;N&quot; PredictionFeatureImportance : dijelaskan oleh
+Prediction &quot;1&quot; --&gt; &quot;N&quot; DecisionLog : diputuskan melalui
+AppUser &quot;1&quot; --&gt; &quot;N&quot; DecisionLog : membuat
+AppUser &quot;0..1&quot; --&gt; &quot;N&quot; Prediction : menginput actual
+AppUser &quot;1&quot; --&gt; &quot;N&quot; OperationalConfig : memperbarui
+AppUser &quot;1&quot; --&gt; &quot;N&quot; ConfigHistory : mengubah
+ConfigHistory &quot;1&quot; --&gt; &quot;N&quot; ConfigHistoryDetail : terdiri atas
+Notification &quot;1&quot; --&gt; &quot;N&quot; NotificationAudience : ditujukan ke
+AppUser &quot;1&quot; --&gt; &quot;N&quot; NotificationRead : membaca
+Notification &quot;1&quot; --&gt; &quot;N&quot; NotificationRead : dibaca dalam
+note bottom of ManpowerRecommendation
+  1:1 embed manpower → tabel terpisah,
+  PK = FK pred_id
+end note
+note bottom of PredictionFeatureImportance
+  atribut multinilai feature_importance
+  → tabel, PK komposit
+end note
+note bottom of ConfigHistoryDetail
+  weak entity: map old/new_values
+  → PK (history_id, field_name)
+end note
+note bottom of NotificationAudience
+  array audience_roles → tabel,
+  PK (notif_id, role)
+end note
+note bottom of NotificationRead
+  M:N AppUser–Notification
+  → tabel junction
+end note
+@enduml</pre>
+<p><img class="diagram" src="img/lrs_transformasi.png" alt="lrs_transformasi"></p>
+<h2>3. LRS final</h2>
+<pre class="plantuml">@startuml lrs_final
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide circle
+hide methods
+skinparam linetype ortho
+left to right direction
+class Warehouse &lt;&lt;Table&gt;&gt; {
+  + wh_id : VARCHAR
+  - name : VARCHAR
+  - city : VARCHAR
+}
+class AppUser &lt;&lt;Table&gt;&gt; {
+  + uid : VARCHAR
+  # wh_id : VARCHAR
+  - display_name : VARCHAR
+  - email : VARCHAR
+  - role : VARCHAR
+  - job_title : VARCHAR
+}
+class DailyData &lt;&lt;Table&gt;&gt; {
+  + daily_id : VARCHAR
+  # wh_id : VARCHAR
+  - date : DATE
+  - day_of_week : SMALLINT
+  - month : SMALLINT
+  - is_campaign : BOOLEAN
+  - is_holiday : BOOLEAN
+  - is_payday : BOOLEAN
+  - pickup_request_h1 : INTEGER
+  - projection_inbound : INTEGER
+  - backlog_h1 : INTEGER
+  - actual_inbound_h2 : INTEGER
+  - actual_inbound_h1 : INTEGER
+  - actual_inbound : INTEGER
+  - source_file : VARCHAR
+}
+class Prediction &lt;&lt;Table&gt;&gt; {
+  + pred_id : VARCHAR
+  # wh_id : VARCHAR
+  # actual_input_by : VARCHAR
+  - target_date : DATE
+  - predicted : INTEGER
+  - projection : INTEGER
+  - deviation_pct : DECIMAL
+  - alert : BOOLEAN
+  - status : VARCHAR
+  - data_status : VARCHAR
+  - source : VARCHAR
+  - model_version : VARCHAR
+  - generated_at : TIMESTAMP
+  - feat_day_of_week : SMALLINT
+  - feat_month : SMALLINT
+  - feat_is_campaign : BOOLEAN
+  - feat_is_holiday : BOOLEAN
+  - feat_is_payday : BOOLEAN
+  - feat_pickup_request_h1 : INTEGER
+  - feat_projection_inbound : INTEGER
+  - feat_backlog_h1 : INTEGER
+  - feat_actual_inbound_h2 : INTEGER
+  - feat_actual_inbound_h1 : INTEGER
+  - is_backfill : BOOLEAN
+  - actual_inbound : INTEGER
+  - actual_note : VARCHAR
+  - actual_input_at : TIMESTAMP
+  - daily_error_pct : DECIMAL
+  - evaluated : BOOLEAN
+}
+class ManpowerRecommendation &lt;&lt;Table&gt;&gt; {
+  + pred_id : VARCHAR {FK}
+  - rider : INTEGER
+  - driver : INTEGER
+  - op_inbound : INTEGER
+  - op_outbound : INTEGER
+  - snap_capacity_rider : DECIMAL
+  - snap_capacity_driver : DECIMAL
+  - snap_capacity_op_inbound : DECIMAL
+  - snap_capacity_op_outbound : DECIMAL
+  - snap_ratio_rider : DECIMAL
+  - snap_ratio_driver : DECIMAL
+}
+class PredictionFeatureImportance &lt;&lt;Table&gt;&gt; {
+  + pred_id : VARCHAR {FK}
+  + feature_name : VARCHAR
+  - importance : DECIMAL
+}
+class OperationalConfig &lt;&lt;Table&gt;&gt; {
+  + wh_id : VARCHAR {FK}
+  # updated_by : VARCHAR
+  - capacity_rider : DECIMAL
+  - capacity_driver : DECIMAL
+  - capacity_op_inbound : DECIMAL
+  - capacity_op_outbound : DECIMAL
+  - ratio_rider : DECIMAL
+  - ratio_driver : DECIMAL
+  - rounding : VARCHAR
+  - updated_at : TIMESTAMP
+}
+class ConfigHistory &lt;&lt;Table&gt;&gt; {
+  + history_id : VARCHAR
+  # wh_id : VARCHAR
+  # changed_by : VARCHAR
+  - changed_by_name : VARCHAR
+  - changed_at : TIMESTAMP
+}
+class ConfigHistoryDetail &lt;&lt;Table&gt;&gt; {
+  + history_id : VARCHAR {FK}
+  + field_name : VARCHAR
+  - old_value : DECIMAL
+  - new_value : DECIMAL
+}
+class DecisionLog &lt;&lt;Table&gt;&gt; {
+  + decision_id : VARCHAR
+  # pred_id : VARCHAR
+  # wh_id : VARCHAR
+  # decided_by : VARCHAR
+  - decided_by_name : VARCHAR
+  - decision : VARCHAR
+  - rider_final : INTEGER
+  - driver_final : INTEGER
+  - op_inbound_final : INTEGER
+  - op_outbound_final : INTEGER
+  - reason : VARCHAR
+  - decided_at : TIMESTAMP
+}
+class ModelHealth &lt;&lt;Table&gt;&gt; {
+  + wh_id : VARCHAR {FK}
+  - status : VARCHAR
+  - rolling_mae_7d : DECIMAL
+  - baseline_mae : DECIMAL
+  - drift_threshold : DECIMAL
+  - model_version : VARCHAR
+  - mae_validation : DECIMAL
+  - rmse : DECIMAL
+  - r2 : DECIMAL
+  - updated_at : TIMESTAMP
+}
+class ModelHealthHistory &lt;&lt;Table&gt;&gt; {
+  + history_key : VARCHAR
+  # wh_id : VARCHAR
+  - date : DATE
+  - rolling_mae_7d : DECIMAL
+  - baseline_mae : DECIMAL
+  - drift_threshold : DECIMAL
+  - status : VARCHAR
+}
+class BatchLog &lt;&lt;Table&gt;&gt; {
+  + batch_id : VARCHAR
+  # wh_id : VARCHAR
+  - run_date : DATE
+  - target_date : DATE
+  - started_at : TIMESTAMP
+  - finished_at : TIMESTAMP
+  - duration_sec : INTEGER
+  - status : VARCHAR
+  - retry_count : SMALLINT
+  - source : VARCHAR
+  - message : VARCHAR
+}
+class DatasetStatus &lt;&lt;Table&gt;&gt; {
+  + wh_id : VARCHAR {FK}
+  - last_import_at : TIMESTAMP
+  - range_start : DATE
+  - range_end : DATE
+  - row_count : INTEGER
+  - source_file : VARCHAR
+}
+class Notification &lt;&lt;Table&gt;&gt; {
+  + notif_id : VARCHAR
+  # wh_id : VARCHAR
+  - type : VARCHAR
+  - title : VARCHAR
+  - body : VARCHAR
+  - target_date : DATE
+  - created_at : TIMESTAMP
+}
+class NotificationAudience &lt;&lt;Table&gt;&gt; {
+  + notif_id : VARCHAR {FK}
+  + role : VARCHAR
+}
+class NotificationRead &lt;&lt;Table&gt;&gt; {
+  + uid : VARCHAR {FK}
+  + notif_id : VARCHAR {FK}
+  - read_at : TIMESTAMP
+}
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; AppUser
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; DailyData
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; Prediction
+Warehouse &quot;1&quot; --&gt; &quot;1&quot; OperationalConfig
+Warehouse &quot;1&quot; --&gt; &quot;0..1&quot; ModelHealth
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; ModelHealthHistory
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; BatchLog
+Warehouse &quot;1&quot; --&gt; &quot;0..1&quot; DatasetStatus
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; Notification
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; ConfigHistory
+Warehouse &quot;1&quot; --&gt; &quot;N&quot; DecisionLog
+Prediction &quot;1&quot; --&gt; &quot;0..1&quot; ManpowerRecommendation
+Prediction &quot;1&quot; --&gt; &quot;N&quot; PredictionFeatureImportance
+Prediction &quot;1&quot; --&gt; &quot;N&quot; DecisionLog
+AppUser &quot;1&quot; --&gt; &quot;N&quot; DecisionLog
+AppUser &quot;0..1&quot; --&gt; &quot;N&quot; Prediction
+AppUser &quot;1&quot; --&gt; &quot;N&quot; OperationalConfig
+AppUser &quot;1&quot; --&gt; &quot;N&quot; ConfigHistory
+ConfigHistory &quot;1&quot; --&gt; &quot;N&quot; ConfigHistoryDetail
+Notification &quot;1&quot; --&gt; &quot;N&quot; NotificationAudience
+AppUser &quot;1&quot; --&gt; &quot;N&quot; NotificationRead
+Notification &quot;1&quot; --&gt; &quot;N&quot; NotificationRead
+@enduml</pre>
+<p><img class="diagram" src="img/lrs_final.png" alt="lrs_final"></p>
+<h2>4. Spesifikasi basis data</h2>
+<h3>Tabel Warehouse</h3><p>Master gudang — sumber <code>warehouses</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>Kode gudang, mis. WH-CKG-01</td></tr>
+<tr><td>2</td><td><code>name</code></td><td>VARCHAR</td><td>100</td><td></td><td></td><td>Not Null</td><td>—</td><td>Nama gudang</td></tr>
+<tr><td>3</td><td><code>city</code></td><td>VARCHAR</td><td>100</td><td></td><td></td><td>Null</td><td>—</td><td>Kota</td></tr>
+</table>
+<h3>Tabel AppUser</h3><p>Pengguna aplikasi — sumber <code>users</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>uid</code></td><td>VARCHAR</td><td>128</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>UID Firebase Auth</td></tr>
+<tr><td>2</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td></td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang pengguna</td></tr>
+<tr><td>3</td><td><code>display_name</code></td><td>VARCHAR</td><td>100</td><td></td><td></td><td>Not Null</td><td>—</td><td>Nama tampil</td></tr>
+<tr><td>4</td><td><code>email</code></td><td>VARCHAR</td><td>150</td><td></td><td></td><td>Not Null</td><td>—</td><td>Email login (unik)</td></tr>
+<tr><td>5</td><td><code>role</code></td><td>VARCHAR</td><td>12</td><td></td><td></td><td>Not Null</td><td>—</td><td>admin/manajer/supervisor/viewer</td></tr>
+<tr><td>6</td><td><code>job_title</code></td><td>VARCHAR</td><td>60</td><td></td><td></td><td>Null</td><td>—</td><td>Label role</td></tr>
+</table>
+<h3>Tabel DailyData</h3><p>Data harian hasil impor Excel — sumber <code>daily_data</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>daily_id</code></td><td>VARCHAR</td><td>40</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>{wh}_{YYYYMMDD}</td></tr>
+<tr><td>2</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td></td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>3</td><td><code>date</code></td><td>DATE</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Tanggal (WIB)</td></tr>
+<tr><td>4</td><td><code>day_of_week</code></td><td>SMALLINT</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>1=Senin … 7=Minggu</td></tr>
+<tr><td>5</td><td><code>month</code></td><td>SMALLINT</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Bulan 1–12</td></tr>
+<tr><td>6</td><td><code>is_campaign</code></td><td>BOOLEAN</td><td>—</td><td></td><td></td><td>Not Null</td><td>FALSE</td><td>Ada campaign</td></tr>
+<tr><td>7</td><td><code>is_holiday</code></td><td>BOOLEAN</td><td>—</td><td></td><td></td><td>Not Null</td><td>FALSE</td><td>Hari libur</td></tr>
+<tr><td>8</td><td><code>is_payday</code></td><td>BOOLEAN</td><td>—</td><td></td><td></td><td>Not Null</td><td>FALSE</td><td>Periode gajian</td></tr>
+<tr><td>9</td><td><code>pickup_request_h1</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Pickup request H-1</td></tr>
+<tr><td>10</td><td><code>projection_inbound</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Projection Tim DI</td></tr>
+<tr><td>11</td><td><code>backlog_h1</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Backlog H-1</td></tr>
+<tr><td>12</td><td><code>actual_inbound_h2</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Actual H-2</td></tr>
+<tr><td>13</td><td><code>actual_inbound_h1</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Actual H-1</td></tr>
+<tr><td>14</td><td><code>actual_inbound</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Actual hari itu</td></tr>
+<tr><td>15</td><td><code>source_file</code></td><td>VARCHAR</td><td>150</td><td></td><td></td><td>Null</td><td>—</td><td>Berkas Excel</td></tr>
+</table>
+<h3>Tabel Prediction</h3><p>Prediksi inbound H+1 — sumber <code>predictions</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>pred_id</code></td><td>VARCHAR</td><td>40</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>pred_{wh}_{YYYYMMDD}</td></tr>
+<tr><td>2</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td></td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>3</td><td><code>actual_input_by</code></td><td>VARCHAR</td><td>128</td><td></td><td>AppUser.uid</td><td>Null</td><td>—</td><td>Penginput actual</td></tr>
+<tr><td>4</td><td><code>target_date</code></td><td>DATE</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Tanggal target</td></tr>
+<tr><td>5</td><td><code>predicted</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Prediksi (paket)</td></tr>
+<tr><td>6</td><td><code>projection</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Projection Tim DI</td></tr>
+<tr><td>7</td><td><code>deviation_pct</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Deviasi (%)</td></tr>
+<tr><td>8</td><td><code>alert</code></td><td>BOOLEAN</td><td>—</td><td></td><td></td><td>Not Null</td><td>FALSE</td><td>|deviasi| &gt; 15%</td></tr>
+<tr><td>9</td><td><code>status</code></td><td>VARCHAR</td><td>20</td><td></td><td></td><td>Not Null</td><td>—</td><td>normal/perlu_perhatian</td></tr>
+<tr><td>10</td><td><code>data_status</code></td><td>VARCHAR</td><td>30</td><td></td><td></td><td>Not Null</td><td>&#x27;complete&#x27;</td><td>complete/incomplete_fallback_h2</td></tr>
+<tr><td>11</td><td><code>source</code></td><td>VARCHAR</td><td>5</td><td></td><td></td><td>Not Null</td><td>&#x27;H-1&#x27;</td><td>H-1/H-2</td></tr>
+<tr><td>12</td><td><code>model_version</code></td><td>VARCHAR</td><td>20</td><td></td><td></td><td>Not Null</td><td>—</td><td>Versi model</td></tr>
+<tr><td>13</td><td><code>generated_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Waktu batch</td></tr>
+<tr><td>14</td><td><code>feat_day_of_week</code></td><td>SMALLINT</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Fitur hari</td></tr>
+<tr><td>15</td><td><code>feat_month</code></td><td>SMALLINT</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Fitur bulan</td></tr>
+<tr><td>16</td><td><code>feat_is_campaign</code></td><td>BOOLEAN</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Fitur campaign</td></tr>
+<tr><td>17</td><td><code>feat_is_holiday</code></td><td>BOOLEAN</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Fitur hari libur</td></tr>
+<tr><td>18</td><td><code>feat_is_payday</code></td><td>BOOLEAN</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Fitur payday</td></tr>
+<tr><td>19</td><td><code>feat_pickup_request_h1</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Fitur pickup H-1</td></tr>
+<tr><td>20</td><td><code>feat_projection_inbound</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Fitur projection</td></tr>
+<tr><td>21</td><td><code>feat_backlog_h1</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Fitur backlog H-1</td></tr>
+<tr><td>22</td><td><code>feat_actual_inbound_h2</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Fitur actual H-2</td></tr>
+<tr><td>23</td><td><code>feat_actual_inbound_h1</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Fitur actual H-1</td></tr>
+<tr><td>24</td><td><code>is_backfill</code></td><td>BOOLEAN</td><td>—</td><td></td><td></td><td>Not Null</td><td>FALSE</td><td>Prediksi backfill</td></tr>
+<tr><td>25</td><td><code>actual_inbound</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Actual (≥ 0)</td></tr>
+<tr><td>26</td><td><code>actual_note</code></td><td>VARCHAR</td><td>500</td><td></td><td></td><td>Null</td><td>—</td><td>Catatan actual</td></tr>
+<tr><td>27</td><td><code>actual_input_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Waktu input actual</td></tr>
+<tr><td>28</td><td><code>daily_error_pct</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Null</td><td>—</td><td>Error harian (%)</td></tr>
+<tr><td>29</td><td><code>evaluated</code></td><td>BOOLEAN</td><td>—</td><td></td><td></td><td>Not Null</td><td>FALSE</td><td>Sudah dievaluasi</td></tr>
+</table>
+<h3>Tabel ManpowerRecommendation</h3><p>Rekomendasi manpower per prediksi (1:1) — sumber <code>predictions.manpower</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>pred_id</code></td><td>VARCHAR</td><td>40</td><td>Ya</td><td>Prediction.pred_id</td><td>Not Null</td><td>—</td><td>Prediksi pemilik</td></tr>
+<tr><td>2</td><td><code>rider</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Jumlah Rider (ceil)</td></tr>
+<tr><td>3</td><td><code>driver</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Jumlah Driver (ceil)</td></tr>
+<tr><td>4</td><td><code>op_inbound</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Jumlah Op. Inbound (ceil)</td></tr>
+<tr><td>5</td><td><code>op_outbound</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Jumlah Op. Outbound (ceil)</td></tr>
+<tr><td>6</td><td><code>snap_capacity_rider</code></td><td>DECIMAL</td><td>8,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Snapshot kapasitas Rider</td></tr>
+<tr><td>7</td><td><code>snap_capacity_driver</code></td><td>DECIMAL</td><td>8,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Snapshot kapasitas Driver</td></tr>
+<tr><td>8</td><td><code>snap_capacity_op_inbound</code></td><td>DECIMAL</td><td>8,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Snapshot kapasitas Op. Inbound</td></tr>
+<tr><td>9</td><td><code>snap_capacity_op_outbound</code></td><td>DECIMAL</td><td>8,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Snapshot kapasitas Op. Outbound</td></tr>
+<tr><td>10</td><td><code>snap_ratio_rider</code></td><td>DECIMAL</td><td>4,3</td><td></td><td></td><td>Not Null</td><td>—</td><td>Snapshot rasio Rider</td></tr>
+<tr><td>11</td><td><code>snap_ratio_driver</code></td><td>DECIMAL</td><td>4,3</td><td></td><td></td><td>Not Null</td><td>—</td><td>Snapshot rasio Driver</td></tr>
+</table>
+<h3>Tabel PredictionFeatureImportance</h3><p>Bobot fitur per prediksi (atribut multinilai) — sumber <code>predictions.feature_importance</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>pred_id</code></td><td>VARCHAR</td><td>40</td><td>Ya</td><td>Prediction.pred_id</td><td>Not Null</td><td>—</td><td>Prediksi</td></tr>
+<tr><td>2</td><td><code>feature_name</code></td><td>VARCHAR</td><td>30</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>Nama fitur</td></tr>
+<tr><td>3</td><td><code>importance</code></td><td>DECIMAL</td><td>5,4</td><td></td><td></td><td>Not Null</td><td>—</td><td>Bobot 0–1</td></tr>
+</table>
+<h3>Tabel OperationalConfig</h3><p>Konfigurasi kapasitas aktif per gudang — sumber <code>operational_configs</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td>Ya</td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>2</td><td><code>updated_by</code></td><td>VARCHAR</td><td>128</td><td></td><td>AppUser.uid</td><td>Not Null</td><td>—</td><td>Pengubah terakhir</td></tr>
+<tr><td>3</td><td><code>capacity_rider</code></td><td>DECIMAL</td><td>8,2</td><td></td><td></td><td>Not Null</td><td>350</td><td>&gt; 0</td></tr>
+<tr><td>4</td><td><code>capacity_driver</code></td><td>DECIMAL</td><td>8,2</td><td></td><td></td><td>Not Null</td><td>800</td><td>&gt; 0</td></tr>
+<tr><td>5</td><td><code>capacity_op_inbound</code></td><td>DECIMAL</td><td>8,2</td><td></td><td></td><td>Not Null</td><td>500</td><td>&gt; 0</td></tr>
+<tr><td>6</td><td><code>capacity_op_outbound</code></td><td>DECIMAL</td><td>8,2</td><td></td><td></td><td>Not Null</td><td>600</td><td>&gt; 0</td></tr>
+<tr><td>7</td><td><code>ratio_rider</code></td><td>DECIMAL</td><td>4,3</td><td></td><td></td><td>Not Null</td><td>0.700</td><td>Rasio Rider</td></tr>
+<tr><td>8</td><td><code>ratio_driver</code></td><td>DECIMAL</td><td>4,3</td><td></td><td></td><td>Not Null</td><td>0.300</td><td>Rasio Driver; jumlah = 1,00</td></tr>
+<tr><td>9</td><td><code>rounding</code></td><td>VARCHAR</td><td>10</td><td></td><td></td><td>Not Null</td><td>&#x27;ceil&#x27;</td><td>Pembulatan</td></tr>
+<tr><td>10</td><td><code>updated_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Waktu ubah</td></tr>
+</table>
+<h3>Tabel ConfigHistory</h3><p>Header audit trail konfigurasi — sumber <code>config_history</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>history_id</code></td><td>VARCHAR</td><td>28</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>ID dokumen otomatis</td></tr>
+<tr><td>2</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td></td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>3</td><td><code>changed_by</code></td><td>VARCHAR</td><td>128</td><td></td><td>AppUser.uid</td><td>Not Null</td><td>—</td><td>Pengubah</td></tr>
+<tr><td>4</td><td><code>changed_by_name</code></td><td>VARCHAR</td><td>100</td><td></td><td></td><td>Not Null</td><td>—</td><td>Nama pengubah</td></tr>
+<tr><td>5</td><td><code>changed_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Waktu ubah</td></tr>
+</table>
+<h3>Tabel ConfigHistoryDetail</h3><p>Nilai lama → baru per parameter (weak entity) — sumber <code>config_history.old_values/new_values</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>history_id</code></td><td>VARCHAR</td><td>28</td><td>Ya</td><td>ConfigHistory.history_id</td><td>Not Null</td><td>—</td><td>Header riwayat</td></tr>
+<tr><td>2</td><td><code>field_name</code></td><td>VARCHAR</td><td>30</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>Nama parameter</td></tr>
+<tr><td>3</td><td><code>old_value</code></td><td>DECIMAL</td><td>8,3</td><td></td><td></td><td>Null</td><td>—</td><td>Nilai lama</td></tr>
+<tr><td>4</td><td><code>new_value</code></td><td>DECIMAL</td><td>8,3</td><td></td><td></td><td>Not Null</td><td>—</td><td>Nilai baru</td></tr>
+</table>
+<h3>Tabel DecisionLog</h3><p>Keputusan manpower (append-only) — sumber <code>decision_logs</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>decision_id</code></td><td>VARCHAR</td><td>28</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>ID dokumen otomatis</td></tr>
+<tr><td>2</td><td><code>pred_id</code></td><td>VARCHAR</td><td>40</td><td></td><td>Prediction.pred_id</td><td>Not Null</td><td>—</td><td>Prediksi yang diputuskan</td></tr>
+<tr><td>3</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td></td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>4</td><td><code>decided_by</code></td><td>VARCHAR</td><td>128</td><td></td><td>AppUser.uid</td><td>Not Null</td><td>—</td><td>Pengambil keputusan</td></tr>
+<tr><td>5</td><td><code>decided_by_name</code></td><td>VARCHAR</td><td>100</td><td></td><td></td><td>Not Null</td><td>—</td><td>Nama</td></tr>
+<tr><td>6</td><td><code>decision</code></td><td>VARCHAR</td><td>10</td><td></td><td></td><td>Not Null</td><td>—</td><td>approved/adjusted</td></tr>
+<tr><td>7</td><td><code>rider_final</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Rider final</td></tr>
+<tr><td>8</td><td><code>driver_final</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Driver final</td></tr>
+<tr><td>9</td><td><code>op_inbound_final</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Op. Inbound final</td></tr>
+<tr><td>10</td><td><code>op_outbound_final</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Op. Outbound final</td></tr>
+<tr><td>11</td><td><code>reason</code></td><td>VARCHAR</td><td>500</td><td></td><td></td><td>Null</td><td>—</td><td>Wajib bila adjusted</td></tr>
+<tr><td>12</td><td><code>decided_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Waktu keputusan</td></tr>
+</table>
+<h3>Tabel ModelHealth</h3><p>Kesehatan model terkini per gudang — sumber <code>model_health</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td>Ya</td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>2</td><td><code>status</code></td><td>VARCHAR</td><td>10</td><td></td><td></td><td>Not Null</td><td>—</td><td>healthy/degraded</td></tr>
+<tr><td>3</td><td><code>rolling_mae_7d</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Rolling MAE 7 hari (%)</td></tr>
+<tr><td>4</td><td><code>baseline_mae</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Baseline (%)</td></tr>
+<tr><td>5</td><td><code>drift_threshold</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>1,15 × baseline</td></tr>
+<tr><td>6</td><td><code>model_version</code></td><td>VARCHAR</td><td>20</td><td></td><td></td><td>Not Null</td><td>—</td><td>Versi model</td></tr>
+<tr><td>7</td><td><code>mae_validation</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>MAE validasi (%)</td></tr>
+<tr><td>8</td><td><code>rmse</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>RMSE (%)</td></tr>
+<tr><td>9</td><td><code>r2</code></td><td>DECIMAL</td><td>4,3</td><td></td><td></td><td>Not Null</td><td>—</td><td>R²</td></tr>
+<tr><td>10</td><td><code>updated_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Waktu hitung</td></tr>
+</table>
+<h3>Tabel ModelHealthHistory</h3><p>Riwayat Rolling MAE harian — sumber <code>model_health_history</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>history_key</code></td><td>VARCHAR</td><td>40</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>{wh}_{YYYYMMDD}</td></tr>
+<tr><td>2</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td></td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>3</td><td><code>date</code></td><td>DATE</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Tanggal</td></tr>
+<tr><td>4</td><td><code>rolling_mae_7d</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Rolling MAE (%)</td></tr>
+<tr><td>5</td><td><code>baseline_mae</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Baseline (%)</td></tr>
+<tr><td>6</td><td><code>drift_threshold</code></td><td>DECIMAL</td><td>6,2</td><td></td><td></td><td>Not Null</td><td>—</td><td>Ambang (%)</td></tr>
+<tr><td>7</td><td><code>status</code></td><td>VARCHAR</td><td>10</td><td></td><td></td><td>Not Null</td><td>—</td><td>healthy/degraded</td></tr>
+</table>
+<h3>Tabel BatchLog</h3><p>Log eksekusi batch — sumber <code>batch_logs</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>batch_id</code></td><td>VARCHAR</td><td>40</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>{wh}_{YYYYMMDD}</td></tr>
+<tr><td>2</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td></td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>3</td><td><code>run_date</code></td><td>DATE</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Tanggal eksekusi</td></tr>
+<tr><td>4</td><td><code>target_date</code></td><td>DATE</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Tanggal target</td></tr>
+<tr><td>5</td><td><code>started_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Mulai</td></tr>
+<tr><td>6</td><td><code>finished_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Selesai</td></tr>
+<tr><td>7</td><td><code>duration_sec</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Null</td><td>—</td><td>Durasi (detik)</td></tr>
+<tr><td>8</td><td><code>status</code></td><td>VARCHAR</td><td>10</td><td></td><td></td><td>Not Null</td><td>—</td><td>success/failed</td></tr>
+<tr><td>9</td><td><code>retry_count</code></td><td>SMALLINT</td><td>—</td><td></td><td></td><td>Not Null</td><td>0</td><td>Jumlah retry</td></tr>
+<tr><td>10</td><td><code>source</code></td><td>VARCHAR</td><td>5</td><td></td><td></td><td>Not Null</td><td>—</td><td>H-1/H-2</td></tr>
+<tr><td>11</td><td><code>message</code></td><td>VARCHAR</td><td>500</td><td></td><td></td><td>Null</td><td>—</td><td>Keterangan</td></tr>
+</table>
+<h3>Tabel DatasetStatus</h3><p>Ringkasan dataset per gudang — sumber <code>dataset_status</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td>Ya</td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>2</td><td><code>last_import_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Impor terakhir</td></tr>
+<tr><td>3</td><td><code>range_start</code></td><td>DATE</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Awal data</td></tr>
+<tr><td>4</td><td><code>range_end</code></td><td>DATE</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Akhir data</td></tr>
+<tr><td>5</td><td><code>row_count</code></td><td>INTEGER</td><td>—</td><td></td><td></td><td>Not Null</td><td>0</td><td>Jumlah baris</td></tr>
+<tr><td>6</td><td><code>source_file</code></td><td>VARCHAR</td><td>150</td><td></td><td></td><td>Null</td><td>—</td><td>Berkas sumber</td></tr>
+</table>
+<h3>Tabel Notification</h3><p>Notifikasi dalam aplikasi — sumber <code>notifications</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>notif_id</code></td><td>VARCHAR</td><td>60</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>{type}_{wh}_{YYYYMMDD}</td></tr>
+<tr><td>2</td><td><code>wh_id</code></td><td>VARCHAR</td><td>20</td><td></td><td>Warehouse.wh_id</td><td>Not Null</td><td>—</td><td>Gudang</td></tr>
+<tr><td>3</td><td><code>type</code></td><td>VARCHAR</td><td>12</td><td></td><td></td><td>Not Null</td><td>—</td><td>deviation/degraded/incomplete/batch</td></tr>
+<tr><td>4</td><td><code>title</code></td><td>VARCHAR</td><td>120</td><td></td><td></td><td>Not Null</td><td>—</td><td>Judul</td></tr>
+<tr><td>5</td><td><code>body</code></td><td>VARCHAR</td><td>500</td><td></td><td></td><td>Not Null</td><td>—</td><td>Isi</td></tr>
+<tr><td>6</td><td><code>target_date</code></td><td>DATE</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Tanggal terkait</td></tr>
+<tr><td>7</td><td><code>created_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Waktu dibuat</td></tr>
+</table>
+<h3>Tabel NotificationAudience</h3><p>Role penerima notifikasi (atribut multinilai) — sumber <code>notifications.audience_roles</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>notif_id</code></td><td>VARCHAR</td><td>60</td><td>Ya</td><td>Notification.notif_id</td><td>Not Null</td><td>—</td><td>Notifikasi</td></tr>
+<tr><td>2</td><td><code>role</code></td><td>VARCHAR</td><td>12</td><td>Ya</td><td></td><td>Not Null</td><td>—</td><td>Role penerima</td></tr>
+</table>
+<h3>Tabel NotificationRead</h3><p>Junction M:N AppUser–Notification — sumber <code>users/{uid}/notification_reads</code>.</p>
+<table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Ukuran/Presisi</th><th>PK</th><th>FK (Tabel.Field)</th><th>Null/Not Null</th><th>Default</th><th>Deskripsi</th></tr>
+<tr><td>1</td><td><code>uid</code></td><td>VARCHAR</td><td>128</td><td>Ya</td><td>AppUser.uid</td><td>Not Null</td><td>—</td><td>Pembaca</td></tr>
+<tr><td>2</td><td><code>notif_id</code></td><td>VARCHAR</td><td>60</td><td>Ya</td><td>Notification.notif_id</td><td>Not Null</td><td>—</td><td>Notifikasi</td></tr>
+<tr><td>3</td><td><code>read_at</code></td><td>TIMESTAMP</td><td>—</td><td></td><td></td><td>Not Null</td><td>—</td><td>Waktu dibaca</td></tr>
+</table>
+<p class="sub">Dibuat oleh <code>tools/gen_db_docs.py</code> dari <code>tools/docs_db_model.py</code>; sumber: <code>docs/firestore_schema.md</code>, <code>firebase/firestore.rules</code>, <code>firebase/firestore.indexes.json</code>, <code>lib/core/data/models.dart</code>.</p>
+</body></html>

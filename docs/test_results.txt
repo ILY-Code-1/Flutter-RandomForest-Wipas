@@ -1,0 +1,237 @@
+flutter test --reporter json — 2026-10-28 15:06
+lulus: 230  gagal: 0
+
+[GAGAL]
+
+
+[LULUS]
+/beranda data renders
+/beranda empty shows explanation
+/beranda error shows retry and IT Support after 3 failures
+/beranda loading shows skeleton
+/beranda offline shows banner and cached data
+/evaluasi data renders
+/evaluasi empty shows explanation
+/evaluasi error shows retry and IT Support after 3 failures
+/evaluasi loading shows skeleton
+/evaluasi offline shows banner and cached data
+/manpower data renders
+/manpower empty shows explanation
+/manpower error shows retry and IT Support after 3 failures
+/manpower loading shows skeleton
+/manpower offline shows banner and cached data
+/prediksi data renders
+/prediksi empty shows explanation
+/prediksi error shows retry and IT Support after 3 failures
+/prediksi loading shows skeleton
+/prediksi offline shows banner and cached data
+AccessMatrix admin on /beranda is Access.full
+AccessMatrix admin on /evaluasi is Access.full
+AccessMatrix admin on /input-actual is Access.full
+AccessMatrix admin on /konfigurasi is Access.full
+AccessMatrix admin on /lainnya is Access.full
+AccessMatrix admin on /manpower is Access.full
+AccessMatrix admin on /notifikasi is Access.full
+AccessMatrix admin on /prediksi is Access.readOnly
+AccessMatrix admin on /profil is Access.full
+AccessMatrix admin on /riwayat is Access.full
+AccessMatrix capabilities
+AccessMatrix manajer on /beranda is Access.full
+AccessMatrix manajer on /evaluasi is Access.full
+AccessMatrix manajer on /input-actual is Access.none
+AccessMatrix manajer on /konfigurasi is Access.full
+AccessMatrix manajer on /lainnya is Access.full
+AccessMatrix manajer on /manpower is Access.full
+AccessMatrix manajer on /notifikasi is Access.full
+AccessMatrix manajer on /prediksi is Access.readOnly
+AccessMatrix manajer on /profil is Access.full
+AccessMatrix manajer on /riwayat is Access.readOnly
+AccessMatrix public routes are open, unknown routes are denied
+AccessMatrix supervisor on /beranda is Access.full
+AccessMatrix supervisor on /evaluasi is Access.none
+AccessMatrix supervisor on /input-actual is Access.full
+AccessMatrix supervisor on /konfigurasi is Access.none
+AccessMatrix supervisor on /lainnya is Access.full
+AccessMatrix supervisor on /manpower is Access.readOnly
+AccessMatrix supervisor on /notifikasi is Access.full
+AccessMatrix supervisor on /prediksi is Access.readOnly
+AccessMatrix supervisor on /profil is Access.full
+AccessMatrix supervisor on /riwayat is Access.readOnly
+AccessMatrix tabs per role
+AccessMatrix viewer on /beranda is Access.readOnly
+AccessMatrix viewer on /evaluasi is Access.readOnly
+AccessMatrix viewer on /input-actual is Access.none
+AccessMatrix viewer on /konfigurasi is Access.none
+AccessMatrix viewer on /lainnya is Access.full
+AccessMatrix viewer on /manpower is Access.none
+AccessMatrix viewer on /notifikasi is Access.full
+AccessMatrix viewer on /prediksi is Access.readOnly
+AccessMatrix viewer on /profil is Access.full
+AccessMatrix viewer on /riwayat is Access.readOnly
+ActualValidator empty / negative / non-integer
+ActualValidator valid integers (with id-ID thousands dots)
+ActualValidator.validate WB-AV-P1 empty → wajib diisi
+ActualValidator.validate WB-AV-P2 "-5" → negatif
+ActualValidator.validate WB-AV-P3 "−5" (minus sign) → negatif
+ActualValidator.validate WB-AV-P4 "17,5" → bukan angka bulat
+ActualValidator.validate WB-AV-P5 "." → kosong setelah dibersihkan
+ActualValidator.validate WB-AV-P6 angka melampaui int64 → bukan angka bulat
+ActualValidator.validate WB-AV-P7 "17.560" → valid
+Auth account without a valid role is rejected with a message
+Auth forgot password shows confirmation
+Auth logout via Profil dialog returns to Login
+Auth session older than 24 hours ends with the Sesi berakhir banner
+Auth valid credentials via the form open Beranda for the role
+Auth wrong credentials show the design error
+Beranda date strip switches the target date
+Beranda per role admin: Input Actual + Konfigurasi + Manpower card
+Beranda per role manajer: approval card, no Input Actual
+Beranda per role supervisor: Input Actual only, manpower read-only, no Evaluasi link
+Beranda per role viewer: read-only, no manpower card or links
+Bottom navigation admin sees 5 tabs
+Bottom navigation manajer sees 5 tabs
+Bottom navigation supervisor has no Evaluasi tab
+Bottom navigation viewer has no Manpower tab
+CSV export file name contains the range
+CSV export starts with UTF-8 BOM, comma separated, sorted ascending
+ConfigValidator capacity ≤ 0 and empty values are rejected
+ConfigValidator defaults are valid
+ConfigValidator ratio sum 1,05 is rejected with the design message
+ConfigValidator ratio within 0,001 tolerance is accepted
+ConfigValidator.validate WB-CV-P1 empty map: loop skipped, no ratio → valid
+ConfigValidator.validate WB-CV-P2 null value → "Wajib diisi"
+ConfigValidator.validate WB-CV-P3 value ≤ 0 → "Nilai harus lebih dari 0."
+ConfigValidator.validate WB-CV-P4 positive value, ratio_rider missing → valid
+ConfigValidator.validate WB-CV-P5 ratio_rider present, ratio_driver missing → no ratio check
+ConfigValidator.validate WB-CV-P6 ratios sum to 1,00 → valid
+ConfigValidator.validate WB-CV-P7 ratios 0,60 + 0,30 → ratio error
+CsvExport._cell (via build) WB-CS-P1 null value → empty cell
+CsvExport._cell (via build) WB-CS-P2 plain value → unchanged
+CsvExport._cell (via build) WB-CS-P3 value with comma/quote → quoted and escaped
+DeviationCalculator 18.420 vs 15.900 → +15,8% → Perlu Perhatian
+DeviationCalculator exactly 15% is NOT an alert
+DeviationCalculator just above 15% and negative deviations alert
+DeviationCalculator missing or zero projection gives null
+DeviationCalculator.needsAttention WB-DN-P1 null → false
+DeviationCalculator.needsAttention WB-DN-P2 exactly 15 → false
+DeviationCalculator.needsAttention WB-DN-P3 15,8 → true
+DeviationCalculator.percent WB-DP-P1 predicted null → null
+DeviationCalculator.percent WB-DP-P2 projection null → null
+DeviationCalculator.percent WB-DP-P3 projection ≤ 0 → null
+DeviationCalculator.percent WB-DP-P4 valid → 15,85
+ErrorMetrics daily error = |P − A| / A × 100
+ErrorMetrics drift threshold = 1,15 × baseline
+ErrorMetrics rolling MAE uses the last 7 values
+Evaluasi viewer is read-only
+Evaluation helpers projected rolling MAE replaces the edited day
+Evaluation helpers weekly projection evaluation groups by Monday
+Export CSV (admin) failure state offers retry
+Export CSV (admin) success state with BOM file
+Fallback H-2 shows the Data Incomplete warning
+Fmt (id-ID) dates
+Fmt (id-ID) duration and parsing
+Fmt (id-ID) thousands dot, decimal comma, percent
+Fmt (id-ID) times are always WIB regardless of device zone
+Fmt (id-ID) today in WIB crosses midnight correctly
+H+1 has no decision; adjusted decisions carry a reason
+Input Actual offline disables Simpan
+Input Actual supervisor reminder, validation and save
+Konfigurasi capacity 0 shows a field error
+Konfigurasi ratio error disables save; valid change saves config + history
+Lainnya menu for admin
+Lainnya menu for manajer
+Lainnya menu for supervisor
+Lainnya menu for viewer
+Manpower decisions Cara hitung sheet shows the substituted formula
+Manpower decisions cancel keeps the recommendation pending
+Manpower decisions manajer approves → decision_logs entry + status Disetujui
+Manpower decisions manual adjustment requires a reason
+Manpower decisions offline disables actions with a hint (buttons stay visible)
+Manpower: admin can act
+Manpower: manajer can act
+Manpower: supervisor read-only without actions
+ManpowerCalculator 18.420 → 37 / 7 / 37 / 31 (design example)
+ManpowerCalculator exact multiples are not rounded up
+ManpowerCalculator float noise does not push an exact result up (0.3 × 3 case)
+ManpowerCalculator impact preview with changed capacities (design: 33 / 7 / 37 / 29)
+ManpowerCalculator one parcel above a multiple rounds up
+ManpowerCalculator zero predicted needs zero people
+ManpowerCalculator.compute WB-MP-P1 sequential path: 18.420 → 37/7/37/31
+Model Degraded shows a danger banner on Beranda
+Model converters tolerate missing fields AppUser needs a valid role
+Model converters tolerate missing fields Manpower requires all four counts
+Model converters tolerate missing fields ModelHealth threshold falls back to 1,15 × baseline
+Model converters tolerate missing fields OperationalConfig falls back to defaults
+Model converters tolerate missing fields Other converters
+Model converters tolerate missing fields Prediction with only a target date
+Model converters tolerate missing fields Prediction with wrong types does not throw
+Model converters tolerate missing fields Prediction without target date or data is skipped
+Notifikasi empty state
+Notifikasi filter and mark all read
+Notifikasi for admin includes batch notifications
+Notifikasi for supervisor excludes batch notifications (audience_roles)
+Prediksi (admin): read-only, Faktor pendorong hidden for supervisor only
+Prediksi (manajer): read-only, Faktor pendorong hidden for supervisor only
+Prediksi (supervisor): read-only, Faktor pendorong hidden for supervisor only
+Prediksi (viewer): read-only, Faktor pendorong hidden for supervisor only
+Prediksi H+2 without data shows empty state and "Kembali ke H+1"
+Riwayat 14 hari filter extends the list
+Riwayat admin: export + decisions
+Riwayat manajer: decisions without export
+Riwayat supervisor: decisions without export
+Riwayat viewer: no export and no decision column
+RoleGuard forbidden routes redirect to beranda
+RoleGuard signed out is sent to login (with expired flag)
+RoleGuard unknown session goes to splash
+Route guard manajer cannot open /input-actual
+Route guard supervisor cannot open /evaluasi
+Route guard supervisor cannot open /konfigurasi
+Route guard viewer cannot open /input-actual
+Route guard viewer cannot open /konfigurasi
+Route guard viewer cannot open /manpower
+Text scale 130% renders Beranda without overflow
+admin lands on Beranda with seeded data
+degraded scenario crosses the drift threshold
+empty scenario has accounts and config only
+every seeded prediction stores manpower = formula(predicted)
+fallback scenario: today actual missing, H+1 uses H-2
+golden beranda_admin
+golden beranda_admin_kosong
+golden beranda_admin_loading
+golden beranda_admin_offline
+golden beranda_manajer
+golden beranda_supervisor
+golden beranda_viewer
+golden evaluasi_admin
+golden evaluasi_manajer_degraded
+golden input_actual_supervisor
+golden konfigurasi_admin
+golden lainnya_admin
+golden login
+golden manpower_manajer
+golden manpower_supervisor
+golden notifikasi_admin
+golden prediksi_admin
+golden prediksi_admin_error
+golden prediksi_manajer_grafik
+golden prediksi_viewer_fallback
+golden profil_admin
+golden riwayat_admin
+normal scenario is healthy and rolling MAE matches the data
+normal scenario: H+1 matches the design example
+roleGuard WB-RG-P1 /dev/gallery in debug → allowed
+roleGuard WB-RG-P10 allowed route → null
+roleGuard WB-RG-P11 Viewer on /manpower → /beranda
+roleGuard WB-RG-P3 /splash → allowed
+roleGuard WB-RG-P4 unknown session → /splash
+roleGuard WB-RG-P5 signed out on public route → allowed
+roleGuard WB-RG-P6 signed out, session expired → /login?expired=1
+roleGuard WB-RG-P7 signed out → /login
+roleGuard WB-RG-P8 signed in on /login → /beranda
+roleGuard WB-RG-P9 signed in on /login/lupa → /beranda
+toViewState WB-VS-P1 loading
+toViewState WB-VS-P2 error
+toViewState WB-VS-P3 data without isEmpty callback, online
+toViewState WB-VS-P4 data judged empty
+toViewState WB-VS-P5 data, offline → Offline with lastSync
+toViewState WB-VS-P6 data, online, not empty → Data

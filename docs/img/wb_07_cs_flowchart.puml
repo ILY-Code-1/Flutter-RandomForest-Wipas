@@ -1,0 +1,14 @@
+@startuml wb_07_cs_flowchart
+start
+if (v == null?) then (ya)
+  :return "";
+else (tidak)
+  :s = v.toString();
+  if (s memuat " , CR atau LF?) then (ya)
+    :return "\"" + s (kutip digandakan) + "\"";
+  else (tidak)
+    :return s;
+  endif
+endif
+stop
+@enduml

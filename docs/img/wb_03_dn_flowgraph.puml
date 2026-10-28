@@ -1,0 +1,29 @@
+@startuml wb_03_dn_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle "1" as n1
+circle "2" as n2
+circle "3" as n3
+circle "4" as n4
+circle "5" as n5
+circle "6" as n6
+circle "7" as n7
+n1 --> n2
+n1 --> n3
+n3 --> n4
+n4 --> n5
+n4 --> n6
+n2 --> n7
+n5 --> n7
+n6 --> n7
+legend right
+  1: null?
+  2: return false
+  3: v = round(|d|)
+  4: v > 15?
+  5: return true
+  6: return false
+  7: exit
+endlegend
+@enduml

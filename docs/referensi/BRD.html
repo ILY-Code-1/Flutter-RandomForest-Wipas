@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WIPAS — BRD BPMN SLR v1.1</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --blue:       #2d5be3;
+    --blue-dark:  #1e3fa8;
+    --blue-light: #e8eefb;
+    --gray-50:    #f9fafb;
+    --gray-100:   #f3f4f6;
+    --gray-200:   #e5e7eb;
+    --gray-400:   #9ca3af;
+    --gray-600:   #4b5563;
+    --gray-800:   #1f2937;
+    --gray-900:   #111827;
+    --radius:     6px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 9pt;
+    line-height: 1.45;
+    color: var(--gray-900);
+    background: #fff;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 15px;
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* ── PRINT & PAGE BREAK SETUP ───────────────── */
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  .cover-page, .toc-page {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .section-header {
+    page-break-before: always !important;
+    break-before: page !important;
+    background: var(--blue);
+    color: #fff;
+    font-size: 11pt;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    margin-bottom: 14px;
+    margin-top: 0;
+  }
+
+  .toc-page + .section-header,
+  .first-section {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  table, .formula-block, .bpmn-wrap, .fn-card, blockquote, pre {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  h2, h3, h4 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* ── COVER ───────────────────────────────────── */
+  .cover-page {
+    padding: 80px 20px 40px 30px;
+    border-left: 6px solid var(--blue);
+  }
+  .cover-chip {
+    display: inline-block;
+    border: 1.5px solid var(--blue);
+    color: var(--blue);
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+  }
+  .cover-system {
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 8px;
+  }
+  .cover-title {
+    font-size: 32pt;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--gray-900);
+    margin-bottom: 14px;
+  }
+  .cover-subtitle {
+    font-size: 10.5pt;
+    color: var(--gray-600);
+    margin-bottom: 40px;
+    line-height: 1.5;
+  }
+  .cover-meta {
+    border-top: 1px solid var(--gray-200);
+    padding-top: 16px;
+  }
+  .cover-meta-row { display: flex; gap: 8px; margin-bottom: 8px; font-size: 9pt; }
+  .cover-meta-row strong { font-weight: 600; min-width: 110px; flex-shrink: 0; }
+
+  /* ── TOC ─────────────────────────────────────── */
+  .toc-header {
+    background: var(--blue);
+    color: #fff;
+    font-size: 11pt;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    margin-bottom: 14px;
+    margin-top: 0;
+  }
+  .toc-item {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 9.5pt;
+  }
+  .toc-item-num {
+    font-weight: 700;
+    color: var(--blue);
+    white-space: nowrap;
+    min-width: 70px;
+  }
+
+  /* ── HEADINGS & TEXT ─────────────────────────── */
+  h2 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: var(--blue);
+    margin-top: 16px;
+    margin-bottom: 8px;
+    padding-bottom: 3px;
+    border-bottom: 1.5px solid var(--gray-200);
+  }
+  h3 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-top: 12px;
+    margin-bottom: 4px;
+  }
+  h4 {
+    font-size: 9pt;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+  p { margin-bottom: 6px; text-align: justify; }
+  ul, ol { margin-left: 18px; margin-bottom: 8px; }
+  li { margin-bottom: 2px; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  /* ── MODULE BADGE & HEADINGS ─────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--blue);
+    color: #fff;
+    font-size: 7.5pt;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .module-heading {
+    display: flex;
+    align-items: center;
+    font-size: 9.5pt;
+    font-weight: 700;
+    margin-top: 12px;
+    margin-bottom: 6px;
+  }
+
+  /* ── TABLES ──────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 12px;
+    font-size: 8.5pt;
+  }
+  thead tr { background: var(--blue); color: #fff; }
+  thead th {
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 600;
+  }
+  tbody tr:nth-child(even) { background: var(--gray-50); }
+  tbody tr:nth-child(odd)  { background: #fff; }
+  tbody td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--gray-200);
+    vertical-align: top;
+  }
+  .td-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--blue);
+    color: #fff;
+    font-size: 7.5pt;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* ── FORMULA & CODE ──────────────────────────── */
+  .formula-block {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-left: 3px solid var(--blue);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 8pt;
+    white-space: pre-wrap;
+    line-height: 1.35;
+  }
+  blockquote {
+    border-left: 3px solid var(--blue);
+    padding: 6px 10px;
+    margin: 8px 0;
+    background: var(--gray-50);
+    color: var(--gray-600);
+    font-size: 8.5pt;
+  }
+
+  /* ── BPMN FLOW ───────────────────────────────── */
+  .bpmn-wrap {
+    border: 1px solid var(--gray-200);
+    padding: 10px;
+    border-radius: var(--radius);
+    margin: 10px 0;
+    background: #fff;
+  }
+  .bpmn-title {
+    font-size: 9pt;
+    font-weight: 700;
+    color: var(--gray-800);
+    margin-bottom: 6px;
+  }
+  .bpmn-legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+    font-size: 8pt;
+  }
+  .bpmn-legend-item { display: flex; align-items: center; gap: 4px; }
+  .bpmn-legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  .flow-table { width: 100%; border-collapse: collapse; }
+  .flow-table td { padding: 3px 0; text-align: center; border: none; background: none; }
+  .flow-node {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 8pt;
+    font-weight: 500;
+    min-width: 130px;
+  }
+  .flow-system   { background: #e0e7ff; color: #1e3a8a; border: 1px solid #a5b4fc; }
+  .flow-user     { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+  .flow-python   { background: #fef3c7; color: #78350f; border: 1px solid #fcd34d; }
+  .flow-firebase { background: #dcfce7; color: #14532d; border: 1px solid #86efac; }
+  .flow-decision { background: #fef9c3; color: #713f12; border: 1px solid #fde047; }
+  .flow-start, .flow-end { background: var(--gray-800); color: #fff; border-radius: 12px; }
+  .flow-arrow    { color: var(--gray-400); font-size: 10pt; line-height: 1; text-align: center; }
+
+  hr { border: none; border-top: 1px solid var(--gray-200); margin: 12px 0; }
+  .text-muted { color: var(--gray-600); }
+  .text-sm { font-size: 8pt; }
+
+  @media print {
+    body { width: 100%; max-width: 100%; padding: 0; }
+    .no-print { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ COVER PAGE ═══════════════ -->
+<div class="cover-page">
+  <div class="cover-chip">Business Requirements &amp; Process Design</div>
+  <div class="cover-system">Warehouse Inbound Prediction &amp; Allocation System</div>
+  <div class="cover-title">WIPAS</div>
+  <div class="cover-subtitle">
+    Business Requirements Document (BRD) · Business Process Model &amp; Notation (BPMN) ·<br>
+    Systematic Literature Review (SLR)
+  </div>
+  <div class="cover-meta">
+    <div class="cover-meta-row"><strong>Versi:</strong> 1.1 (Production-Ready Industrial Edition)</div>
+    <div class="cover-meta-row"><strong>Status:</strong> Final for Review</div>
+    <div class="cover-meta-row"><strong>Ruang Lingkup:</strong> Sistem prediksi volume inbound warehouse menggunakan Random Forest berbasis time-series cross-validation untuk evaluasi projection, deteksi concept drift, dan alokasi manpower dinamis berbasis aplikasi Flutter &amp; Cloud Firestore.</div>
+  </div>
+</div>
+
+<!-- ═══════════════ DAFTAR ISI ═══════════════ -->
+<div class="toc-page">
+  <div class="toc-header">Daftar Isi</div>
+  <div class="toc-item"><span class="toc-item-num">Bagian 1</span><span>Business Requirements Document (BRD)</span></div>
+  <div class="toc-item"><span class="toc-item-num">Bagian 2</span><span>BPMN — 5 Proses Bisnis + Arsitektur System Resilience</span></div>
+  <div class="toc-item"><span class="toc-item-num">Bagian 3</span><span>Algoritma, Model Drift &amp; Formula Dynamic Manpower</span></div>
+  <div class="toc-item"><span class="toc-item-num">Bagian 4</span><span>Systematic Literature Review (SLR)</span></div>
+  <div class="toc-item"><span class="toc-item-num">Bagian 5</span><span>Rekomendasi Implementasi &amp; Production Monitoring</span></div>
+</div>
+
+<!-- ═══════════════ BAGIAN 1 BRD ═══════════════ -->
+<div class="section-header first-section">Bagian 1 — Business Requirements Document (BRD)</div>
+
+<h2>1.1 Latar Belakang &amp; Tujuan</h2>
+<p>Perencanaan alokasi manpower warehouse logistik (kurir dan operator) saat ini bertumpu pada projection inbound dari tim Data Intelligence. Dalam praktiknya, terjadi ketidaksesuaian berulang antara projection dan actual inbound yang berdampak pada operasional:</p>
+<ul>
+  <li><strong>Actual &gt; Projection</strong>: Memicu backlog (penumpukan paket di warehouse) dan penundaan SLA Delivery.</li>
+  <li><strong>Projection &gt; Actual</strong>: Menyebabkan overbudget manpower (pemborosan biaya operasional akibat kurir/operator idle).</li>
+</ul>
+<p>Fluktuasi inbound dipengaruhi variabel multi-faktor (campaign, hari libur, payday, pickup request H-1, backlog H-1, dan histori inbound). Metode estimasi konvensional berbasis statistik deskriptif tidak mampu mengolah kompleksitas ini, sehingga dibutuhkan pendekatan Machine Learning ensemble yang tangguh (Amnay &amp; Charani, 2025; Nagendra &amp; Singh, 2023).</p>
+
+<p><strong>Tujuan sistem:</strong></p>
+<ul>
+  <li>Mengurangi risiko backlog dan overbudget manpower melalui prediksi volume inbound yang akurat dan terkalibrasi.</li>
+  <li>Menyediakan evaluasi objektif dan feedback loop otomatis terhadap akurasi projection tim Data Intelligence.</li>
+  <li>Memberikan rekomendasi alokasi manpower secara real-time berbasis konfigurasi kapasitas dinamis (Dynamic Thresholds).</li>
+  <li>Membangun Decision Support System (DSS) berbasis mobile dengan penanganan batch resilience dan idempotency write.</li>
+  <li>Menjadi <em>single source of truth</em> untuk perbandingan projection vs predicted vs actual inbound.</li>
+</ul>
+
+<h2>1.2 Ruang Lingkup (6 Modul)</h2>
+<table>
+  <thead><tr><th>Kode</th><th>Modul</th><th>Fungsi Utama</th></tr></thead>
+  <tbody>
+    <tr><td><span class="td-badge">M1</span></td><td><strong>Data Collection &amp; Preprocessing</strong></td><td>Pengumpulan data historis, cleaning, encoding, handling missing value, dan data validation</td></tr>
+    <tr><td><span class="td-badge">M2</span></td><td><strong>Model Training &amp; Evaluation</strong></td><td>Training Random Forest dengan TimeSeriesSplit k-folds, evaluasi MAE/MSE/RMSE/R², feature importance, &amp; drift metric</td></tr>
+    <tr><td><span class="td-badge">M3</span></td><td><strong>Prediction &amp; Batch Engine</strong></td><td>Batch processing harian, retry resilience, dan Idempotent Upsert ke Cloud Firestore</td></tr>
+    <tr><td><span class="td-badge">M4</span></td><td><strong>Mobile Application (Flutter)</strong></td><td>Dashboard, visualisasi, evaluasi projection, rekomendasi manpower dinamis, &amp; konfig parameter</td></tr>
+    <tr><td><span class="td-badge">M5</span></td><td><strong>Authentication &amp; Authorization</strong></td><td>Firebase Authentication, RBAC (Role-Based Access Control)</td></tr>
+    <tr><td><span class="td-badge">M6</span></td><td><strong>Data Management &amp; Monitoring</strong></td><td>Cloud Firestore, Idempotency Document Key (`pred_{wh_id}_{YYYYMMDD}`), &amp; Model Health Monitoring</td></tr>
+  </tbody>
+</table>
+<blockquote>Di luar scope: Integrasi langsung ERP/WMS legacy via hardware sensor, auto-retraining tanpa validasi human-in-the-loop, platform iOS.</blockquote>
+
+<h2>1.3 Stakeholder</h2>
+<table>
+  <thead><tr><th>Peran</th><th>Kepentingan</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Supervisor Operasional</strong></td><td>Memantau prediksi harian, membandingkan dengan projection, mengalokasikan manpower harian</td></tr>
+    <tr><td><strong>Manajer Warehouse</strong></td><td>Mereview evaluasi akurasi, mengonfigurasi parameter kapasitas operasional, mengambil keputusan SDM</td></tr>
+    <tr><td><strong>Tim Data Intelligence</strong></td><td>Menerima feedback objektif tentang akurasi projection, memantau data drift, perbaikan metode forecasting</td></tr>
+    <tr><td><strong>Kurir &amp; Operator</strong></td><td>Mendapat alokasi beban kerja rasional, mengurangi overtime mendadak vs idle time</td></tr>
+    <tr><td><strong>Manajemen Logistik</strong></td><td>Monitoring KPI operasional, efisiensi unit cost manpower, pemenuhan SLA pengiriman</td></tr>
+    <tr><td><strong>IT / MLOps Support</strong></td><td>Maintenance pipeline batch, monitoring Firestore write rate, log troubleshooting</td></tr>
+  </tbody>
+</table>
+
+<h2>1.4 Kebutuhan Fungsional</h2>
+
+<div class="module-heading"><span class="badge">M1</span> Data Collection &amp; Preprocessing</div>
+<ul>
+  <li><strong>FR1.1</strong> Sistem mengumpulkan data historis inbound harian dari database warehouse.</li>
+  <li><strong>FR1.2</strong> Sistem melakukan data cleaning: hapus duplikat, deteksi outlier (metode IQR dengan batas fleksibel).</li>
+  <li><strong>FR1.3</strong> Sistem menangani missing value dengan forward-fill (time-series) dan median (skewed numeric).</li>
+  <li><strong>FR1.4</strong> Sistem encoding fitur boolean (Campaign, Hari Libur, Payday) menjadi 0/1.</li>
+  <li><strong>FR1.5</strong> Sistem memvalidasi rentang nilai non-negative untuk semua fitur numerik dan log ketersediaan data.</li>
+</ul>
+
+<div class="module-heading"><span class="badge">M2</span> Model Training &amp; Evaluation</div>
+<ul>
+  <li><strong>FR2.1</strong> Sistem melakukan pembagian data time-series menggunakan <strong>Rolling-Window Cross-Validation (TimeSeriesSplit k-folds)</strong> untuk mencegah data leakage dan bias musiman.</li>
+  <li><strong>FR2.2</strong> Sistem melatih model Random Forest Regressor dengan 10 fitur prediktor.</li>
+  <li><strong>FR2.3</strong> Sistem mengevaluasi performa model menggunakan MAE, MSE, RMSE, dan R² pada setiap fold.</li>
+  <li><strong>FR2.4</strong> Sistem menghasilkan feature importance untuk analisis faktor penyebab deviasi volume.</li>
+  <li><strong>FR2.5</strong> Sistem menyimpan model terlatih beserta metadata parameter untuk batch processing harian.</li>
+  <li><strong>FR2.6</strong> Sistem menghitung <strong>Model Health Index (MHI)</strong> berbasis Rolling MAE 7-Hari untuk mendeteksi Concept Drift.</li>
+</ul>
+
+<div class="module-heading"><span class="badge">M3</span> Prediction Engine &amp; Batch Resilience</div>
+<ul>
+  <li><strong>FR3.1</strong> Sistem menjalankan batch processing harian otomatis pada pukul 23:00 WIB menggunakan data H-1.</li>
+  <li><strong>FR3.2</strong> Sistem menghasilkan prediksi volume inbound untuk H+1.</li>
+  <li><strong>FR3.3</strong> Sistem menggunakan <strong>Idempotent Upsert Write Strategy</strong> ke Cloud Firestore untuk mencegah duplikasi data jika terjadi retry execution.</li>
+  <li><strong>FR3.4</strong> Sistem mencatat log eksekusi batch (timestamp, status, retry count, execution time).</li>
+  <li><strong>FR3.5</strong> Sistem menerapkan fallback otomatis ke data H-2 jika pemicu data H-1 mengalami keterlambatan pipeline.</li>
+</ul>
+
+<div class="module-heading"><span class="badge">M4</span> Mobile Application</div>
+<ul>
+  <li><strong>FR4.1</strong> User dapat login menggunakan Firebase Authentication (email/password).</li>
+  <li><strong>FR4.2</strong> User dapat memilih tanggal dan melihat detail prediksi inbound H+1.</li>
+  <li><strong>FR4.3</strong> User dapat melihat perbandingan Projection vs Predicted vs Actual (tabel &amp; grafik).</li>
+  <li><strong>FR4.4</strong> User dapat melihat persentase deviasi antara Projection dan Predicted.</li>
+  <li><strong>FR4.5</strong> User dapat melihat estimasi rekomendasi manpower dinamis yang dihitung berdasarkan <strong>Dynamic Threshold Configuration</strong>.</li>
+  <li><strong>FR4.6</strong> User Admin/Manager dapat mengedit parameter kapasitas operasional (Kapasitas Rider, Driver, Op. Inbound, Op. Outbound) langsung melalui aplikasi.</li>
+  <li><strong>FR4.7</strong> User dapat melihat visualisasi tren inbound dan feature importance.</li>
+  <li><strong>FR4.8</strong> User menerima indikator visual saat sistem mendeteksi Data/Concept Drift (Rolling MAE &gt; 15%).</li>
+</ul>
+
+<div class="module-heading"><span class="badge">M5</span> Authentication &amp; Authorization</div>
+<ul>
+  <li><strong>FR5.1</strong> Sistem menyediakan registrasi akun dengan approval admin.</li>
+  <li><strong>FR5.2</strong> Sistem menyediakan role-based access: Admin, Manajer, Supervisor, Viewer.</li>
+  <li><strong>FR5.3</strong> Sistem menyediakan session management dan auto-logout setelah 24 jam.</li>
+  <li><strong>FR5.4</strong> Sistem menyediakan fitur reset password melalui email.</li>
+</ul>
+
+<div class="module-heading"><span class="badge">M6</span> Data Management</div>
+<ul>
+  <li><strong>FR6.1</strong> Sistem menyimpan hasil prediksi harian di Firestore dengan skema ID dokumen komposit: `pred_{warehouse_id}_{YYYYMMDD}`.</li>
+  <li><strong>FR6.2</strong> Sistem menyimpan histori evaluasi dan log perubahan parameter untuk audit trail.</li>
+  <li><strong>FR6.3</strong> Sistem menyediakan backup otomatis data Firestore setiap minggu.</li>
+  <li><strong>FR6.4</strong> Sistem menyediakan fitur export data ke CSV untuk analisis lebih lanjut.</li>
+  <li><strong>FR6.5</strong> Sistem menyimpan konfigurasi kapasitas operasional pada koleksi `operational_configs` Firestore.</li>
+</ul>
+
+<h2>1.5 Kebutuhan Non-Fungsional</h2>
+<table>
+  <thead><tr><th>Aspek</th><th>Kebutuhan</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Keamanan</strong></td><td>Firebase Authentication, Firestore Security Rules per Role, enkripsi TLS/SSL saat transit</td></tr>
+    <tr><td><strong>Performa &amp; Resiliensi</strong></td><td>Waktu muat dashboard &lt; 3 detik, batch processing &lt; 5 menit, <strong>Idempotent Retry Safety</strong></td></tr>
+    <tr><td><strong>Akurasi Model</strong></td><td>Rolling MAE ≤ 10%, RMSE ≤ 15%, R² ≥ 0.85 pada pengujian TimeSeriesSplit</td></tr>
+    <tr><td><strong>Ketersediaan</strong></td><td>Firebase SLA uptime 99.9%, aplikasi offline-capable untuk data ter-cache di local SQLite/Hive</td></tr>
+    <tr><td><strong>Skalabilitas</strong></td><td>Mendukung data historis multi-tahun, hingga 100 concurrent users per hub</td></tr>
+    <tr><td><strong>Usability</strong></td><td>Mobile-responsive UI, fleksibilitas konfigurasi kapasitas tanpa deploy ulang aplikasi</td></tr>
+    <tr><td><strong>Compatibility</strong></td><td>Android 7.0+ (API Level 24), resolusi minimal 720×1280</td></tr>
+    <tr><td><strong>Maintainability</strong></td><td>Modular code structure, logging komprehensif, deteksi Model Drift otomatis</td></tr>
+  </tbody>
+</table>
+
+<h2>1.6 Arsitektur Sistem</h2>
+<p>Sistem WIPAS menggunakan pendekatan <strong>Daily Resilient Batch Processing &amp; Dynamic Cloud Sync</strong>:</p>
+<ul>
+  <li><strong>Python Offline &amp; Execution Batch</strong> — script Python mengeksekusi preprocessing, evaluasi TimeSeriesSplit, dan pengerjaan model RF secara batch harian, lalu melakukan `upsert` ke Cloud Firestore menggunakan Deterministic Key.</li>
+  <li><strong>Firebase Cloud Services</strong> — Cloud Firestore sebagai penyimpanan real-time, `operational_configs` untuk variabel dinamis, dan Firebase Auth untuk kontrol akses.</li>
+  <li><strong>Flutter Mobile App</strong> — membaca hasil prediksi dan parameter operasional secara real-time, menyajikan kalkulasi manpower dinamis, dan memberikan antarmuka manajemen konfigurasi.</li>
+</ul>
+<p class="text-sm text-muted"><em>Lihat gambar arsitektur detail: gambar_brd.png</em></p>
+
+<h2>1.7 Dataset &amp; Fitur Prediktor</h2>
+<table>
+  <thead><tr><th>No</th><th>Fitur</th><th>Tipe</th><th>Alasan Pemilihan &amp; Landasan SLR</th></tr></thead>
+  <tbody>
+    <tr><td class="text-muted">—</td><td>Tanggal</td><td>Date</td><td>Metadata indeks waktu (tidak dimasukkan ke model ML)</td></tr>
+    <tr><td>1</td><td><strong>Hari</strong></td><td>Int</td><td>Memodelkan pola siklis harian/mingguan (SLR RQ3)</td></tr>
+    <tr><td>2</td><td><strong>Bulan</strong></td><td>Int</td><td>Memodelkan pola musiman tahunan (SLR RQ3)</td></tr>
+    <tr><td>3</td><td><strong>Campaign</strong></td><td>Bool</td><td>Menangkap spike volume akibat promo e-commerce (misal 11.11, 12.12)</td></tr>
+    <tr><td>4</td><td><strong>Hari Libur</strong></td><td>Bool</td><td>Mengakomodasi perubahan pola pengiriman hari libur/tanggal merah</td></tr>
+    <tr><td>5</td><td><strong>Payday</strong></td><td>Bool</td><td>Mengakomodasi lonjakan transaksi tanggal gajian (25–31)</td></tr>
+    <tr><td>6</td><td><strong>Pickup Request H-1</strong></td><td>Int</td><td>Indikator beban pickup harian — Prediktor Kuat (SLR)</td></tr>
+    <tr><td>7</td><td><strong>Projection Inbound</strong></td><td>Int</td><td>Baseline pembanding kinerja model ML dari tim Data Intelligence</td></tr>
+    <tr><td>8</td><td><strong>Backlog H-1</strong></td><td>Int</td><td>Akumulasi beban inbound tertahan hari sebelumnya</td></tr>
+    <tr><td>9</td><td><strong>Actual Inbound H-2</strong></td><td>Int</td><td>Autokorelasi tren harian (2 hari sebelumnya)</td></tr>
+    <tr><td>10</td><td><strong>Actual Inbound H-1</strong></td><td>Int</td><td>Autokorelasi histori terkuat — Prediktor Kuat (SLR)</td></tr>
+    <tr style="background:#e8eefb"><td><strong>T</strong></td><td><strong>Actual Inbound</strong></td><td><strong>Int</strong></td><td><strong>Target regresi yang diprediksi oleh model ML</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>1.8 Aturan Bisnis Kunci</h2>
+<table>
+  <thead><tr><th>Kode</th><th>Aturan</th></tr></thead>
+  <tbody>
+    <tr><td><strong>BR1</strong></td><td>Prediksi dihasilkan untuk H+1 berdasarkan data ketersediaan H-1.</td></tr>
+    <tr><td><strong>BR2</strong></td><td>Batch processing harian berjalan otomatis pukul 23:00 WIB dengan skema eksekusi idempotensi.</td></tr>
+    <tr><td><strong>BR3</strong></td><td>Jika data H-1 tidak lengkap/delay, sistem menggunakan H-2 sebagai fallback dengan flag peringatan (<em>Data Incomplete Warning</em>).</td></tr>
+    <tr><td><strong>BR4</strong></td><td>Deviasi &gt; 15% antara Projection dan Predicted memicu notifikasi peringatan ke Manajer Warehouse.</td></tr>
+    <tr><td><strong>BR5</strong></td><td>Kapasitas kerja dan rasio alokasi kurir/operator bersifat <strong>Dinamis</strong> (dapat diubah via aplikasi oleh Manager/Admin).</td></tr>
+    <tr><td><strong>BR6</strong></td><td>Model Health Index dipantau mingguan; jika Rolling MAE 7-Hari menyimpang &gt; 15% (Concept Drift), sistem memicu indikator <em>Model Degraded</em> untuk retraining manual.</td></tr>
+    <tr><td><strong>BR7</strong></td><td>Hasil prediksi bersifat rekomendasi (Decision Support); keputusan alokasi akhir tetap di tangan Manajer Operasional.</td></tr>
+    <tr><td><strong>BR8</strong></td><td>Data actual inbound wajib di-input Supervisor setiap akhir shift untuk menjaga keterhubungan feedback loop.</td></tr>
+    <tr><td><strong>BR9</strong></td><td>Histori Firestore disimpan secara active-query selama 2 tahun; data lebih lama diarsipkan.</td></tr>
+    <tr><td><strong>BR10</strong></td><td>Akses fitur dibatasi ketat berbasis Role (Admin, Manajer, Supervisor, Viewer).</td></tr>
+  </tbody>
+</table>
+
+<h2>1.9 Hak Akses per Role</h2>
+<table>
+  <thead><tr><th>Aktor</th><th>Hak Akses</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Admin</strong></td><td>Full access: CRUD data, manage users, konfirmasi/update parameter kapasitas, export data</td></tr>
+    <tr><td><strong>Manajer Warehouse</strong></td><td>Read all data, approve manpower allocation, edit parameter kapasitas operasional, review evaluasi &amp; drift alert</td></tr>
+    <tr><td><strong>Supervisor Operasional</strong></td><td>Read prediction, input actual inbound harian, view dashboard &amp; rekomendasi manpower</td></tr>
+    <tr><td><strong>Viewer (Tim Data Intelligence)</strong></td><td>Read-only: dashboard, evaluasi projection, feature importance, monitoring model health index</td></tr>
+    <tr><td><strong>IT Support</strong></td><td>System monitoring, log batch access, troubleshooting — tanpa akses intervensi keputusan bisnis</td></tr>
+  </tbody>
+</table>
+
+<h2>1.10 Manfaat per Pihak</h2>
+<table>
+  <thead><tr><th>Pihak</th><th>Manfaat Nyata</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Supervisor Operasional</strong></td><td>Alokasi manpower presisi, meminimalisir penumpukan paket (backlog) dan idle time</td></tr>
+    <tr><td><strong>Manajer Warehouse</strong></td><td>Keputusan berbasis data objektif, fleksibilitas penyesuaian parameter kapasitas cabang</td></tr>
+    <tr><td><strong>Tim Data Intelligence</strong></td><td>Feedback loop otomatis untuk evaluasi dan perbaikan metode forecasting internal</td></tr>
+    <tr><td><strong>Kurir &amp; Operator</strong></td><td>Beban kerja terdistribusi secara adil, mengurangi kepastian overtime mendadak</td></tr>
+    <tr><td><strong>Manajemen Logistik</strong></td><td>Pengurangan biaya operasional, efisiensi unit cost pengiriman, ketepatan SLA</td></tr>
+  </tbody>
+</table>
+
+<h2>1.11 Roadmap Pengembangan</h2>
+<table>
+  <thead><tr><th style="text-align:center">Fase</th><th>Modul</th><th>Fokus</th><th style="text-align:center">Timeline</th></tr></thead>
+  <tbody>
+    <tr><td style="text-align:center"><strong>1</strong></td><td>M1 + M2</td><td>Data cleaning, TimeSeriesSplit validation, Random Forest training &amp; drift pipeline</td><td style="text-align:center">Bulan 1–2</td></tr>
+    <tr><td style="text-align:center"><strong>2</strong></td><td>M3 + M6</td><td>Batch processing engine, Idempotent Firestore write, schema config setup</td><td style="text-align:center">Bulan 2–3</td></tr>
+    <tr><td style="text-align:center"><strong>3</strong></td><td>M5 + M4</td><td>Authentication, Role-based security rules, Flutter UI core development</td><td style="text-align:center">Bulan 3–5</td></tr>
+    <tr><td style="text-align:center"><strong>4</strong></td><td>M4</td><td>Dashboard, Dynamic Threshold Config page, manpower calculation engine</td><td style="text-align:center">Bulan 5–6</td></tr>
+    <tr><td style="text-align:center"><strong>5</strong></td><td>Integration &amp; UAT</td><td>End-to-end resilience testing, User Acceptance Testing, production deployment</td><td style="text-align:center">Bulan 6–7</td></tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════ BAGIAN 2 BPMN ═══════════════ -->
+<div class="section-header">Bagian 2 — BPMN (Business Process Model &amp; Notation) &amp; Arsitektur</div>
+
+<p>Proses bisnis WIPAS dimodelkan dengan memperhatikan aspek keandalan data (resilience), siklus penanganan drift, serta fleksibilitas parameter operasional.</p>
+
+<!-- BPMN 1 -->
+<div class="bpmn-wrap">
+  <div class="bpmn-title">BPMN 1 — Data Collection, Cleaning &amp; Resilience Check (Python Script)</div>
+  <div class="bpmn-legend">
+    <div class="bpmn-legend-item"><div class="bpmn-legend-dot" style="background:#fef3c7;border:1px solid #fcd34d"></div> Python Script</div>
+    <div class="bpmn-legend-item"><div class="bpmn-legend-dot" style="background:#e0e7ff;border:1px solid #a5b4fc"></div> Sistem</div>
+    <div class="bpmn-legend-item"><div class="bpmn-legend-dot" style="background:#fef9c3;border:1px solid #fde047"></div> Decision</div>
+  </div>
+  <table class="flow-table">
+    <tr><td><span class="flow-node flow-start">▶ Trigger Cron Batch 23:00 WIB</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-python">Extract Data Historis<br>dari Warehouse DB</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-system">Validasi Kelengkapan Data H-1</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-decision">◆ Data H-1 Lengkap?</span></td></tr>
+    <tr><td style="font-size:8pt; color:#4b5563; padding:2px 0">
+      <span style="margin-right:40px">Ya ↓</span><span>Tidak → Load H-2 (Fallback) + Set Peringatan Incomplete</span>
+    </td></tr>
+    <tr><td><span class="flow-node flow-python">Data Cleaning<br>(Hapus Duplikat, Deteksi Outlier Flexible IQR)</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-python">Handle Missing Value<br>(Forward-fill &amp; Median)</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-python">Encoding Boolean (0/1)<br>+ Validasi Non-negative</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-decision">◆ Data Valid?</span></td></tr>
+    <tr><td style="font-size:8pt; color:#4b5563; padding:2px 0">
+      <span style="margin-right:40px">Ya ↓</span><span>Tidak → Log Error Batch + Trigger Alarm Admin</span>
+    </td></tr>
+    <tr><td><span class="flow-node flow-end">✔ Data Preprocessed Siap</span></td></tr>
+  </table>
+</div>
+
+<!-- BPMN 2 -->
+<div class="bpmn-wrap">
+  <div class="bpmn-title">BPMN 2 — Model Training, Evaluation &amp; Idempotent Batch Write (Python Script)</div>
+  <div class="bpmn-legend">
+    <div class="bpmn-legend-item"><div class="bpmn-legend-dot" style="background:#fef3c7;border:1px solid #fcd34d"></div> Python Script</div>
+    <div class="bpmn-legend-item"><div class="bpmn-legend-dot" style="background:#e0e7ff;border:1px solid #a5b4fc"></div> Sistem</div>
+    <div class="bpmn-legend-item"><div class="bpmn-legend-dot" style="background:#dcfce7;border:1px solid #86efac"></div> Cloud Firestore</div>
+  </div>
+  <table class="flow-table">
+    <tr><td><span class="flow-node flow-start">▶ Load Data Preprocessed</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-python">Split Data time-series<br>(Rolling-Window Cross-Validation / TimeSeriesSplit)</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-python">Train Random Forest Regressor<br>(10 Fitur Prediktor)</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-system">Evaluasi Model per Fold<br>(MAE, MSE, RMSE, R²)</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-decision">◆ R² ≥ 0.85 &amp; MAE ≤ 10%?</span></td></tr>
+    <tr><td style="font-size:8pt; color:#4b5563; padding:2px 0">
+      <span style="margin-right:30px">Ya ↓</span><span>Tidak → Log Warning + Tandai Status Degradasi Model</span>
+    </td></tr>
+    <tr><td><span class="flow-node flow-python">Generate Prediksi H+1<br>(dari Data H-1)</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-system">Hitung Deviasi vs Projection<br>Deviasi &gt; 15%? → Set Alert Flag</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-firebase">Idempotent Upsert ke Firestore<br>(Key: `pred_{wh_id}_{YYYYMMDD}`)</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-end">✔ Batch Selesai (Safe from Duplication)</span></td></tr>
+  </table>
+</div>
+
+<!-- BPMN 3 -->
+<div class="bpmn-wrap">
+  <div class="bpmn-title">BPMN 3 — Mobile App: View Prediction &amp; Dynamic Manpower Recommendation</div>
+  <div class="bpmn-legend">
+    <div class="bpmn-legend-item"><div class="bpmn-legend-dot" style="background:#dbeafe;border:1px solid #93c5fd"></div> User (Supervisor/Manager)</div>
+    <div class="bpmn-legend-item"><div class="bpmn-legend-dot" style="background:#e0e7ff;border:1px solid #a5b4fc"></div> Sistem / Firebase</div>
+  </div>
+  <table class="flow-table">
+    <tr><td><span class="flow-node flow-start">▶ Buka Aplikasi Mobile</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-user">Login (Email + Password)</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-system">Verifikasi Firebase Auth &amp; Read User Role</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-decision">◆ Autentikasi Valid?</span></td></tr>
+    <tr><td style="font-size:8pt; color:#4b5563; padding:2px 0">
+      <span style="margin-right:40px">Ya ↓</span><span>Tidak → Tampilkan Pesan Error</span>
+    </td></tr>
+    <tr><td><span class="flow-node flow-firebase">Fetch Hasil Prediksi &amp; Read Config Dinamis<br>dari `operational_configs`</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-system">Tampilkan Dashboard<br>Projection vs Predicted vs Actual + Indicator Deviasi</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-system">Kalkulasi Manpower Dinamis<br>menggunakan Parameter Kapasitas Cabang</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-user">Review Rekomendasi Manpower</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-decision">◆ Setuju dengan Rekomendasi?</span></td></tr>
+    <tr><td style="font-size:8pt; color:#4b5563; padding:2px 0">
+      <span style="margin-right:30px">Ya → Approve &amp; Simpan Decision Log</span><span>Tidak → Manual Adjustment &amp; Simpan Reason Log</span>
+    </td></tr>
+    <tr><td><span class="flow-node flow-end">✔ Selesai</span></td></tr>
+  </table>
+</div>
+
+<!-- BPMN 4 -->
+<div class="bpmn-wrap">
+  <div class="bpmn-title">BPMN 4 — Evaluation, Model Drift &amp; Continuous Feedback Loop</div>
+  <table class="flow-table">
+    <tr><td><span class="flow-node flow-start">▶ Akhir Shift Operasional</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-user">Supervisor Input Actual Inbound Harian</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-firebase">Update Firestore Dokumen (`pred_{wh_id}_{YYYYMMDD}`)</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-system">Hitung Error Harian |Predicted – Actual|<br>dan Update Rolling MAE 7-Hari</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-decision">◆ Rolling MAE &gt; 15% (Data/Concept Drift)?</span></td></tr>
+    <tr><td style="font-size:8pt; color:#4b5563; padding:2px 0">
+      <span style="margin-right:30px">Ya ↓ Flag 'Model Degraded' + Notifikasi MLOps</span><span>Tidak → Simpan ke Histori Model Health</span>
+    </td></tr>
+    <tr><td><span class="flow-node flow-user">Tim Data Intelligence / MLOps: Review Feature Importance<br>&amp; Analisis Perubahan Pola Data</span></td></tr>
+    <tr><td class="flow-arrow">↓</td></tr>
+    <tr><td><span class="flow-node flow-decision">◆ Perlu Retraining Model?</span></td></tr>
+    <tr><td style="font-size:8pt; color:#4b5563; padding:2px 0">
+      <span style="margin-right:30px">Ya → Collect New Data + Retrain + Validasi + Deploy</span><span>Tidak → Penyesuaian Metode Projection Tim DI</span>
+    </td></tr>
+    <tr><td><span class="flow-node flow-end">✔ Selesai (Feedback Loop Aktif)</span></td></tr>
+  </table>
+</div>
+
+<!-- BPMN 5 -->
+<div class="bpmn-wrap">
+  <div class="bpmn-title">BPMN 5 — End-to-End Overview (WIPAS Terintegrasi)</div>
+  <table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin:4px 0">
+    <thead>
+      <tr>
+        <th style="background:#e0e7ff;color:#1e3a8a;padding:6px;border:1px solid #a5b4fc;text-align:center">Python Engine (Batch)</th>
+        <th style="background:#dcfce7;color:#14532d;padding:6px;border:1px solid #86efac;text-align:center">Firebase Cloud</th>
+        <th style="background:#dbeafe;color:#1e40af;padding:6px;border:1px solid #93c5fd;text-align:center">Flutter Mobile App</th>
+        <th style="background:#fef3c7;color:#78350f;padding:6px;border:1px solid #fcd34d;text-align:center">Operational Decision</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:6px;border:1px solid #e5e7eb;vertical-align:top;background:#f0f4ff">
+          1. Extract &amp; Preprocess<br>2. TimeSeriesSplit CV<br>3. Train RF Regressor<br>4. Generate H+1 Prediction
+        </td>
+        <td style="padding:6px;border:1px solid #e5e7eb;vertical-align:top;background:#f0fdf4">
+          5. Idempotent Write (`upsert`)<br>6. Store `operational_configs`<br>7. Secure Authentication<br>8. Log Model Health Index
+        </td>
+        <td style="padding:6px;border:1px solid #e5e7eb;vertical-align:top;background:#eff6ff">
+          9. Read Real-time Sync<br>10. Dashboard Visualization<br>11. Dynamic Manpower Calc<br>12. Config Parameter UI
+        </td>
+        <td style="padding:6px;border:1px solid #e5e7eb;vertical-align:top;background:#fefce8">
+          13. Review &amp; Approve<br>14. Manual Adjustment<br>15. Input Actual Inbound<br>16. Drift Alerting Loop
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <blockquote>Alur event: <strong>Batch selesai</strong> → Idempotent Firestore Write → Flutter Sync → Rekomendasi Manpower Dinamis Terupdate.</blockquote>
+</div>
+
+<!-- ═══════════════ BAGIAN 3 ALGORITMA ═══════════════ -->
+<div class="section-header">Bagian 3 — Algoritma &amp; Formula</div>
+
+<h2>3.1 Random Forest Regressor &amp; Time-Series Cross-Validation</h2>
+<p>Random Forest adalah ensemble learning method yang membangun <em>multiple decision trees</em> berbasis teknik bootstrap aggregation (bagging). Untuk data time-series logistik, pembagian data dilakukan secara bertahap menggunakan <strong>TimeSeriesSplit</strong> untuk mempertahankan urutan kronologis data.</p>
+
+<div class="formula-block">
+RF_Prediction = (1/N) × Σ_{k=1}^{N} Tree_k(x)
+
+Evaluasi Cross Validation (TimeSeriesSplit k-folds):
+  Fold k: Data Train = [1 ... t_k], Data Validation = [t_k + 1 ... t_k + m]
+
+Hyperparameter Utama:
+  n_estimators      : 100 - 200 trees
+  max_depth         : 10 - 20
+  min_samples_split : 5 - 10
+  criterion         : squared_error
+</div>
+
+<h2>3.2 Metrik Evaluasi Performa Model &amp; Drift Detection</h2>
+
+<h3>Mean Absolute Error (MAE)</h3>
+<div class="formula-block">MAE = (1/n) × Σ |y_i - ŷ_i|</div>
+
+<h3>Root Mean Squared Error (RMSE)</h3>
+<div class="formula-block">RMSE = √[ (1/n) × Σ (y_i - ŷ_i)² ]</div>
+
+<h3>R² Score (Coefficient of Determination)</h3>
+<div class="formula-block">R² = 1 - [ Σ(y_i - ŷ_i)² ] / [ Σ(y_i - ȳ)² ]</div>
+
+<h3>Model Health Index (MHI) &amp; Concept Drift Detection</h3>
+<div class="formula-block">
+Rolling_MAE_7d = (1/7) × Σ_{d=1}^{7} |Actual_d - Predicted_d|
+
+Indikator Drift:
+  Jika Rolling_MAE_7d > 1.15 × Baseline_MAE  ==> Trigger Status 'Model Degraded'
+</div>
+<blockquote>Target Kinerja Model: Rolling MAE ≤ 10% · RMSE ≤ 15% · R² ≥ 0.85</blockquote>
+
+<h2>3.3 Konversi Prediksi ke Estimasi Manpower Dinamis</h2>
+<p>Kapasitas kerja operasional dihitung menggunakan parameter fleksibel yang disimpan pada koleksi Firestore `operational_configs`, bukan angka konstan <em>hardcoded</em>.</p>
+
+<h3>Formula Estimasi Kurir (Rider &amp; Driver)</h3>
+<div class="formula-block">
+Rider  (Kebutuhan Armada Motor)  = (Predicted_Inbound × Ratio_Rider) / Capacity_Rider
+Driver (Kebutuhan Armada Mobil)  = (Predicted_Inbound × Ratio_Driver) / Capacity_Driver
+
+Keterangan Parameter Dinamis (Configurable via App):
+  Ratio_Rider   : Proporsi porsi volume kurir motor (Default: 0.70)
+  Ratio_Driver  : Proporsi porsi volume kurir mobil (Default: 0.30)
+  Capacity_Rider: Standar penyelesaian paket per rider/hari (Default Config: 350)
+  Capacity_Driver: Standar penyelesaian paket per driver/hari (Default Config: 800)
+</div>
+
+<h3>Formula Estimasi Operator Warehouse</h3>
+<div class="formula-block">
+Op. Inbound  (Unloading & Receiving) = Predicted_Inbound / Capacity_Op_Inbound
+Op. Outbound (Sorting & Staging)     = Predicted_Inbound / Capacity_Op_Outbound
+
+Keterangan Parameter Dinamis (Configurable via App):
+  Capacity_Op_Inbound : Standar penanganan receiving per operator (Default Config: 500)
+  Capacity_Op_Outbound: Standar penanganan sorting per operator (Default Config: 600)
+</div>
+
+<h2>3.4 Perhitungan Deviasi Projection</h2>
+<div class="formula-block">Deviasi (%) = |Predicted - Projection| / Projection × 100%</div>
+<blockquote>Deviasi &gt; 15%: memicu alarm perhatian untuk Manajer Warehouse dan Tim Data Intelligence.</blockquote>
+
+<h2>3.5 Feature Importance</h2>
+<div class="formula-block">
+Importance(f) = (1/T) × Σ_t Σ_{s ∈ S_t(f)} (n_s / N) × Δi(s,t)
+</div>
+
+<p><strong>Ranking Kontribusi Fitur Prediktor (Sesuai Sintesis SLR):</strong></p>
+<table>
+  <thead><tr><th>Tingkat Pengaruh</th><th>Fitur Prediktor</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Sangat Tinggi</strong></td><td>Actual Inbound H-1, Pickup Request H-1</td></tr>
+    <tr><td><strong>Tinggi</strong></td><td>Backlog H-1, Actual Inbound H-2, Projection Inbound</td></tr>
+    <tr><td><strong>Sedang–Tinggi</strong></td><td>Campaign, Payday, Hari Libur</td></tr>
+    <tr><td><strong>Sedang</strong></td><td>Hari, Bulan</td></tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════ BAGIAN 4 SLR ═══════════════ -->
+<div class="section-header">Bagian 4 — Systematic Literature Review (SLR)</div>
+
+<h2>4.1 Tujuan SLR</h2>
+<ol>
+  <li>Mengidentifikasi metode ML paling efektif untuk prediksi volume inbound warehouse logistik.</li>
+  <li>Menganalisis performa Random Forest dibanding metode time-series konvensional dan deep learning (ARIMA, LSTM, XGBoost).</li>
+  <li>Mengkaji fitur/faktor operasional paling berpengaruh terhadap akurasi prediksi volume.</li>
+  <li>Mengidentifikasi tantangan penanganan model drift dan penyajian hasil prediksi untuk perencanaan manpower.</li>
+  <li>Menentukan research gap yang mendasari pentingnya pengembangan Decision Support System (DSS) berbasis mobile.</li>
+</ol>
+
+<h2>4.2 Metode SLR</h2>
+
+<h3>4.2.1 Pertanyaan Penelitian (Research Questions)</h3>
+<table>
+  <thead><tr><th>RQ</th><th>Pertanyaan</th><th>Justifikasi</th></tr></thead>
+  <tbody>
+    <tr><td><strong>RQ1</strong></td><td>Metode ML apa yang paling efektif dan robust untuk prediksi volume inbound logistik?</td><td>Identifikasi algoritma terbaik untuk data multi-faktor heterogen</td></tr>
+    <tr><td><strong>RQ2</strong></td><td>Bagaimana performa Random Forest vs LSTM, ARIMA, Linear Regression?</td><td>Validasi teknis pemilihan Random Forest Regressor</td></tr>
+    <tr><td><strong>RQ3</strong></td><td>Fitur/faktor operasional apa yang paling dominan mempengaruhi volume inbound?</td><td>Menentukan 10 fitur prediktor utama pada model ML</td></tr>
+    <tr><td><strong>RQ4</strong></td><td>Apa tantangan utama penerapan prediksi volume ke perencanaan manpower operasional?</td><td>Justifikasi kebutuhan DSS mobile dengan parameter kapasitas dinamis</td></tr>
+  </tbody>
+</table>
+
+<h3>4.2.2 Strategi Pencarian</h3>
+<ul>
+  <li><strong>Database Utama</strong>: Google Scholar, IEEE Xplore, ScienceDirect, SpringerLink</li>
+  <li><strong>Kata kunci boolean</strong>: ("Random Forest" OR "Machine Learning") AND ("Demand Forecasting" OR "Inbound Prediction") AND ("Warehouse" OR "Manpower Planning")</li>
+  <li><strong>Rentang publikasi</strong>: 2020–2026</li>
+</ul>
+
+<h3>4.2.3 Kriteria Seleksi</h3>
+<table>
+  <thead><tr><th>Inklusi</th><th>Eksklusi</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>
+        • Prediksi volume berbasis ML/DL<br>
+        • Menggunakan RF atau algoritma perbandingan<br>
+        • Evaluasi kuantitatif (MAE, RMSE, R², MAPE)<br>
+        • Domain logistik/warehouse/workforce<br>
+        • Publikasi 2020–2026
+      </td>
+      <td>
+        • Artikel opini/non-akademik<br>
+        • Tanpa pengujian eksperimental<br>
+        • Full-text tidak accessible<br>
+        • Fokus hanya outbound/sales murni<br>
+        • Publikasi sebelum 2020
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>4.2.4 Proses Seleksi — PRISMA Framework</h3>
+<p class="text-sm text-muted"><em>Lihat diagram PRISMA: gambar_slr.png</em></p>
+<table>
+  <thead><tr><th>Tahap</th><th>Jumlah</th><th>Keterangan</th></tr></thead>
+  <tbody>
+    <tr><td>Identifikasi</td><td>250+</td><td>Artikel dari seluruh database</td></tr>
+    <tr><td>Hapus Duplikasi</td><td>180</td><td>Artikel unik setelah dedup</td></tr>
+    <tr><td>Screening Judul</td><td>85</td><td>Artikel relevan dengan topik</td></tr>
+    <tr><td>Screening Abstrak</td><td>32</td><td>Artikel sesuai kriteria inklusi</td></tr>
+    <tr><td>Evaluasi Full-Text</td><td>18</td><td>Artikel memenuhi seluruh syarat kualitatif</td></tr>
+    <tr><td><strong>Artikel Dianalisis</strong></td><td><strong>7 utama + 11 pendukung</strong></td><td>Digunakan dalam sintesis analisis SLR</td></tr>
+  </tbody>
+</table>
+
+<h2>4.3 Hasil SLR per Tema</h2>
+
+<h3>Tema 1: Ensemble Learning untuk Supply Chain Forecasting</h3>
+<p><strong>Amnay &amp; Charani (2025)</strong> — Perbandingan ARIMA, ANN, dan RF untuk demand forecasting SCM. RF terbukti sangat kompetitif dibanding ARIMA &amp; ANN, tahan terhadap noise data, dan unggul saat menangani variabel campuran (numerik + katagoris).</p>
+<blockquote><em>Implikasi WIPAS</em>: Random Forest sangat efisien untuk memproses kombinasi variabel numerik (vol) dan boolean (campaign/payday).</blockquote>
+
+<h3>Tema 2: Perbandingan Time Series Forecasting Methods &amp; Validation</h3>
+<p><strong>Ormanda &amp; Ardiansah (2026)</strong> — LSTM mencapai akurasi tertinggi (MAPE 0.43%), diikuti Random Forest (MAPE 0.67%), sedangkan ARIMA dan Regresi Linear menunjukkan error &gt;10% pada tren non-linear.</p>
+<p><strong>Nagendra &amp; Singh (2023)</strong> — Menganalisis bahwa RF &amp; LSTM jauh mengungguli ARIMA pada data ber-fluktuasi tinggi.</p>
+<blockquote><em>Implikasi WIPAS</em>: Meskipun LSTM sedikit lebih presisi, Random Forest dipilih karena efisiensi komputasi batch harian, kemudahan tuning, serta transparansi interpretasi (feature importance). Validation dioptimalkan menggunakan TimeSeriesSplit.</blockquote>
+
+<h3>Tema 3: Feature Importance &amp; Model Drift Handling</h3>
+<p><strong>Mohammed &amp; Mandal (2022)</strong> — Menganalisis keunggulan Feature Importance pada RF dalam memberikan penjelasan kausalitas bagi manajemen.</p>
+<p><strong>Bai (2024)</strong> — Menggarisbawahi bahwa model ML rentan terhadap perubahan pola data eksternal (data drift), sehingga membutuhkan metrik pemantauan kinerja harian/mingguan.</p>
+<blockquote><em>Implikasi WIPAS</em>: Actual H-1 &amp; Pickup H-1 merupakan prediktor terkuat; indikator Rolling MAE diimplementasikan untuk menangani Model Drift.</blockquote>
+
+<h3>Tema 4: Workforce Planning &amp; Logistics Optimization</h3>
+<p><strong>Eichenseer et al. (2024)</strong> — ML mampu memprediksi posisi pengiriman untuk alokasi kerja, namun integrasi real-time ke aplikasi operasional lapangan masih menjadi hambatan utama.</p>
+<p><strong>Lesmana &amp; Purnomo (2025)</strong> — Menggunakan RF untuk estimasi transfer time logistik, namun belum mengaitkan hasil prediksi secara otomatis ke angka kebutuhan manpower.</p>
+<blockquote><em>Implikasi WIPAS</em>: Celah utama literature diatasi oleh WIPAS dengan menghubungkan hasil prediksi volume ke kalkulasi alokasi manpower dinamis berbasis aplikasi mobile Flutter.</blockquote>
+
+<h2>4.4 Matriks Sintesis Literatur</h2>
+<table>
+  <thead><tr><th>No</th><th>Penulis (Tahun)</th><th>Jurnal/Konferensi</th><th>Metode</th><th>Hasil Utama</th><th>Relevansi WIPAS</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Amnay &amp; Charani (2025)</td><td>Lecture Notes in Networks &amp; Systems</td><td>ARIMA, ANN, RF</td><td>RF kompetitif vs ARIMA &amp; ANN pada data multivariat</td><td>RQ1: Pemilihan RF Regressor</td></tr>
+    <tr><td>2</td><td>Ormanda &amp; Ardiansah (2026)</td><td>Jurnal Informatika Terpadu</td><td>ARIMA, LR, RF, LSTM</td><td>LSTM 0.43%, RF 0.67% (RF unggul efisiensi)</td><td>RQ2: Trade-off RF vs Deep Learning</td></tr>
+    <tr><td>3</td><td>Nagendra &amp; Singh (2023)</td><td>IEEE GCAT 2023</td><td>ARIMA, LR, RF, LSTM</td><td>RF &amp; LSTM &gt; ARIMA &amp; LR pada non-linear trend</td><td>RQ2: Validasi model ensemble</td></tr>
+    <tr><td>4</td><td>Bai (2024)</td><td>Proceedings ICEAI</td><td>Regression, NN, Ensemble</td><td>Ensemble (RF) akurasi tertinggi, sensitif drift</td><td>RQ1 &amp; RQ3: Model Drift monitoring</td></tr>
+    <tr><td>5</td><td>Mohammed &amp; Mandal (2022)</td><td>Intl Journal of SCM</td><td>SVM, RF, Deep Learning</td><td>Feature importance RF sangat interpretable</td><td>RQ3: Analisis kontribusi fitur</td></tr>
+    <tr><td>6</td><td>Eichenseer et al. (2024)</td><td>Semantic Scholar</td><td>Data-driven ML</td><td>Prediksi posisi untuk alokasi kerja logistik</td><td>RQ4: Workforce planning gap</td></tr>
+    <tr><td>7</td><td>Lesmana &amp; Purnomo (2025)</td><td>Semantic Scholar</td><td>ML (RF)</td><td>RF efektif prediksi transfer time logistik</td><td>RQ4: Celah integrasi aplikasi mobile</td></tr>
+  </tbody>
+</table>
+
+<h2>4.5 Research Gap &amp; Posisi WIPAS</h2>
+
+<h3>4.5.1 Identifikasi Research Gap</h3>
+<table>
+  <thead><tr><th>Gap</th><th>Kondisi Existing Literature</th><th>Solusi WIPAS (Industrial Grade)</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Domain Spesifik</strong></td><td>Studi RF mayoritas pada supply chain makro / harga komoditas</td><td>WIPAS fokus inbound volume warehouse dengan 10 fitur operasional spesifik logistik</td></tr>
+    <tr><td><strong>Variabel Operasional</strong></td><td>Belum ada model yang menguji kombinasi Pickup H-1 + Backlog H-1 + Projection</td><td>WIPAS mengintegrasikan akumulasi backlog &amp; pickup request sebagai fitur prediktor utama</td></tr>
+    <tr><td><strong>Integrasi Manpower</strong></td><td>Studi workforce planning terpisah dari engine prediksi volume</td><td>WIPAS mengintegrasikan prediksi volume → konversi otomatis estimasi manpower dinamis</td></tr>
+    <tr><td><strong>Aksesibilitas Mobile DSS</strong></td><td>Literatur berfokus pada script/notebook offline tanpa antarmuka tim lapangan</td><td>WIPAS menyediakan Flutter Mobile App + Firebase Firestore untuk akses real-time supervisor</td></tr>
+    <tr><td><strong>Resilience &amp; Drift Handling</strong></td><td>Mayoritas studi mengabaikan idempotency write dan data drift di produksi</td><td>WIPAS menyediakan Idempotent Upsert (`pred_{wh_id}_{YYYYMMDD}`) &amp; Rolling MAE Drift Alert</td></tr>
+  </tbody>
+</table>
+
+<h3>4.5.2 Research Gap Matrix</h3>
+<table>
+  <thead><tr><th>Aspek</th><th>Studi Terdahulu</th><th>Penelitian WIPAS</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Domain Utama</strong></td><td>Supply chain umum / stok barang retailer</td><td>Operational Inbound Warehouse Logistik Express</td></tr>
+    <tr><td><strong>Model Prediksi</strong></td><td>Komparasi teoritis (RF, LSTM, ARIMA)</td><td>RF Regressor dengan TimeSeriesSplit CV &amp; Drift Detection</td></tr>
+    <tr><td><strong>Fitur Prediktor</strong></td><td>Fitur umum time-series / demografi</td><td>10 fitur spesifik logistik (Backlog H-1, Pickup H-1, Campaign, dll.)</td></tr>
+    <tr><td><strong>Output Sistem</strong></td><td>Hanya metrik evaluasi (MAE/RMSE)</td><td>Prediksi + Evaluasi Projection + Estimasi Manpower Dinamis</td></tr>
+    <tr><td><strong>Platform</strong></td><td>Script Python / Google Colab Notebook</td><td>Aplikasi Mobile (Flutter) + Cloud Backend (Firebase)</td></tr>
+    <tr><td><strong>Target Pengguna</strong></td><td>Data Scientist / Researcher</td><td>Supervisor, Manajer Warehouse, &amp; Tim Operasional</td></tr>
+  </tbody>
+</table>
+
+<h2>4.6 Kesimpulan SLR &amp; Daftar Pustaka</h2>
+
+<h3>Kesimpulan</h3>
+<ol>
+  <li><strong>Ensemble learning (Random Forest)</strong> konsisten menghasilkan performa tinggi pada data supply chain multivariat: robust terhadap outlier, mampu menangani fitur campuran (boolean &amp; numerik), serta memiliki <em>feature importance</em> yang transparan.</li>
+  <li><strong>TimeSeriesSplit Cross-Validation</strong> wajib digunakan menggantikan split acak/statis untuk mencegah <em>data leakage</em> pada evaluasi data logistik.</li>
+  <li><strong>Fitur paling berpengaruh</strong>: Actual Inbound H-1 &amp; Pickup Request H-1 (sangat tinggi), Backlog H-1 &amp; Actual H-2 (tinggi), Campaign/Payday/Hari Libur (sedang–tinggi).</li>
+  <li><strong>Tantangan utama operasional</strong>: Ketiadaan antarmuka real-time dan fleksibilitas konfigurasi kapasitas kerja di lapangan. Model ML di environment notebook tidak berdampak jika tidak dihubungkan ke aplikasi mobile DSS.</li>
+  <li><strong>Kontribusi Utama WIPAS</strong>: Menutup research gap dengan menghadirkan platform end-to-end yang mengintegrasikan prediksi volume, evaluasi projection, perhitungan manpower dinamis, dan jaminan <em>resilience</em> Idempotent Write.</li>
+</ol>
+
+<h3>Daftar Pustaka</h3>
+<ol class="text-sm">
+  <li>Amnay, I., &amp; Charani, E. (2025). Demand forecasting in supply chain: Performance evaluation of ARIMA, ANN, and random forest models. <em>Lecture Notes in Networks and Systems</em>. Springer. https://doi.org/10.1007/978-3-032-01536-5_18</li>
+  <li>Bai, Y. (2024). Machine learning implementation for demand forecasting in supply chain management. <em>Proceedings ICEAI</em>. https://doi.org/10.5220/0013206900004568</li>
+  <li>Eichenseer, P., Hans, L., &amp; Winkler, H. (2024). A data-driven ML model for forecasting delivery positions in logistics for workforce planning. <em>Semantic Scholar</em>.</li>
+  <li>Lesmana, H., &amp; Purnomo, A. (2025). Logistics management optimization through ML: A predictive model for item transfer time. <em>Semantic Scholar</em>.</li>
+  <li>Mohammed, I., &amp; Mandal, J. (2022). Forecasting accuracy through machine learning in supply chain management. <em>International Journal of Supply Chain Management</em>, 7(2). https://doi.org/10.47604/ijscm.3074</li>
+  <li>Nagendra, B., &amp; Singh, G. (2023). Comparing ARIMA, linear regression, random forest, and LSTM for time series forecasting. <em>IEEE GCAT 2023</em>. https://doi.org/10.1109/gcat59970.2023.10353372</li>
+  <li>Ormanda, M., &amp; Ardiansah, I. (2026). Komparasi model ARIMA, regresi linear, random forest, dan LSTM untuk peramalan harga beras Jawa Barat. <em>Jurnal Informatika Terpadu</em>, 12(1), 70–76. https://doi.org/10.54914/jit.v12i1.2789</li>
+</ol>
+
+<!-- ═══════════════ BAGIAN 5 IMPLEMENTASI ═══════════════ -->
+<div class="section-header">Bagian 5 — Rekomendasi Implementasi</div>
+
+<h2>5.1 Tech Stack</h2>
+<table>
+  <thead><tr><th>Layer</th><th>Teknologi</th><th>Justifikasi</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Machine Learning</strong></td><td>Python 3.9+, scikit-learn, pandas, numpy</td><td>Ekosistem ML mature, mendukung TimeSeriesSplit &amp; RF</td></tr>
+    <tr><td><strong>Model Storage</strong></td><td>Joblib / Pickle</td><td>Efisien untuk serialisasi model Random Forest</td></tr>
+    <tr><td><strong>Cloud Platform</strong></td><td>Firebase (Firestore, Auth, Cloud Functions)</td><td>Real-time sync, offline persistence, serverless infrastructure</td></tr>
+    <tr><td><strong>Mobile Framework</strong></td><td>Flutter 3.x (Dart)</td><td>Cross-platform native performance, arsitektur UI deklaratif</td></tr>
+    <tr><td><strong>Data Visualization</strong></td><td>fl_chart (Flutter), matplotlib/seaborn (Python)</td><td>Lightweight charting untuk mobile &amp; laporan analitik</td></tr>
+    <tr><td><strong>Batch &amp; Resilience</strong></td><td>Cron job / Airflow + Idempotent Upsert Script</td><td>Eksekusi batch otomatis teruji tanpa duplikasi data</td></tr>
+    <tr><td><strong>Version Control &amp; CI/CD</strong></td><td>Git + GitHub Actions</td><td>Automated testing &amp; deployment pipeline</td></tr>
+    <tr><td><strong>Monitoring</strong></td><td>Firebase Crashlytics &amp; Custom Health Logging</td><td>Real-time error tracking &amp; pemantauan model drift</td></tr>
+  </tbody>
+</table>
+
+<h2>5.2 Fase Pengembangan</h2>
+<table>
+  <thead><tr><th style="text-align:center">Fase</th><th>Modul</th><th>Fokus Utama</th><th>Deliverables Utama</th><th style="text-align:center">Timeline</th></tr></thead>
+  <tbody>
+    <tr><td style="text-align:center"><strong>1</strong></td><td>M1 + M2</td><td>Data cleaning, TimeSeriesSplit CV, RF training, Drift pipeline</td><td>Cleaned dataset, trained model, evaluation report</td><td style="text-align:center">Bulan 1–2</td></tr>
+    <tr><td style="text-align:center"><strong>2</strong></td><td>M3 + M6</td><td>Batch script development, Idempotent write logic, Firestore schema</td><td>Resilient Python batch script, Firestore rules</td><td style="text-align:center">Bulan 2–3</td></tr>
+    <tr><td style="text-align:center"><strong>3</strong></td><td>M5</td><td>Authentication &amp; Role-based authorization</td><td>Firebase Auth setup, RBAC security rules</td><td style="text-align:center">Bulan 3</td></tr>
+    <tr><td style="text-align:center"><strong>4</strong></td><td>M4 (UI/UX)</td><td>Mobile app navigation &amp; dashboard screens</td><td>Dashboard Flutter UI, chart component</td><td style="text-align:center">Bulan 3–5</td></tr>
+    <tr><td style="text-align:center"><strong>5</strong></td><td>M4 (Features)</td><td>Dynamic Manpower Engine &amp; Parameter Config UI</td><td>Modul kalkulasi manpower dinamis &amp; halaman config</td><td style="text-align:center">Bulan 5–6</td></tr>
+    <tr><td style="text-align:center"><strong>6</strong></td><td>Integration</td><td>Retry resilience testing, UAT, &amp; System Integration</td><td>Test report, bug fix, performance validation</td><td style="text-align:center">Bulan 6</td></tr>
+    <tr><td style="text-align:center"><strong>7</strong></td><td>Deployment</td><td>Production rollout, Training user, Maintenance handoff</td><td>Production app, user documentation</td><td style="text-align:center">Bulan 6–7</td></tr>
+  </tbody>
+</table>
+
+<h2>5.3 Prinsip Sistem Terintegrasi &amp; Resilience</h2>
+<ul>
+  <li><strong>Single Sign-On &amp; Role Security</strong> — Firebase Auth dengan aturan keamanan Firestore berbasis Role untuk melindungi konfigurasi.</li>
+  <li><strong>Idempotent Batch Upsert</strong> — Menggunakan kunci dokumen terprediksi (`pred_{wh_id}_{YYYYMMDD}`) agar rerun batch tidak memicu duplikasi record.</li>
+  <li><strong>Dynamic Config Synchronization</strong> — Parameter kapasitas kerja disimpan di Cloud Firestore (`operational_configs`) dan di-stream real-time ke aplikasi Flutter.</li>
+  <li><strong>Offline Persistence</strong> — Flutter app meng-cache data lokal untuk menjamin keberlanjutan operasional saat koneksi gudang tidak stabil.</li>
+  <li><strong>Model Health &amp; Drift Alerting</strong> — Notifikasi otomatis di dashboard saat Rolling MAE 7-Hari melebihi ambang batas toleransi.</li>
+  <li><strong>Human-in-the-Loop Decision Support</strong> — Sistem memberikan rekomendasi presisi, namun wewenang penyesuaian akhir tetap pada Manajer Operasional.</li>
+</ul>
+
+<h2>5.4 Risk Mitigation Matrix</h2>
+<table>
+  <thead><tr><th>Identifikasi Risiko</th><th style="text-align:center">Prob.</th><th style="text-align:center">Impact</th><th>Strategi Mitigasi Operasional</th></tr></thead>
+  <tbody>
+    <tr><td>Keterlambatan / Ketidaklengkapan data H-1</td><td style="text-align:center">Medium</td><td style="text-align:center">High</td><td>Fallback otomatis ke data H-2 dengan flag <em>Incomplete Data Warning</em></td></tr>
+    <tr><td>Kegagalan jaringan saat eksekusi Cron Batch</td><td style="text-align:center">Medium</td><td style="text-align:center">High</td><td>Retry mechanism dengan Idempotent Upsert Key (`pred_{wh_id}_{YYYYMMDD}`)</td></tr>
+    <tr><td>Data / Concept Drift akibat campaign mendadak</td><td style="text-align:center">Medium</td><td style="text-align:center">High</td><td>Monitoring Rolling MAE 7-Hari &amp; trigger <em>Model Degraded Alert</em> untuk retraining</td></tr>
+    <tr><td>Perubahan kapasitas riil kurir di lapangan</td><td style="text-align:center">High</td><td style="text-align:center">Medium</td><td>Penyediaan fitur <em>Dynamic Threshold Config Page</em> pada aplikasi mobile Manager/Admin</td></tr>
+    <tr><td>Resistensi pengguna terhadap rekomendasi sistem</td><td style="text-align:center">Medium</td><td style="text-align:center">Medium</td><td>Modul transparansi <em>Feature Importance</em> &amp; pelatihan operasional bertahap</td></tr>
+    <tr><td>Biaya Firebase Overrun</td><td style="text-align:center">Low</td><td style="text-align:center">Medium</td><td>Optimasi indexing Firestore &amp; pembatasan query window harian</td></tr>
+  </tbody>
+</table>
+
+<hr>
+<div style="text-align:center;margin-top:36px;color:var(--gray-400);font-size:8.5pt">
+  <p><em>— Selesai —</em></p>
+  <p style="margin-top:4px"><strong style="color:var(--gray-700)">WIPAS BRD / BPMN / SLR v1.1 — Production-Ready Industrial Edition</strong></p>
+</div>
+
+<!-- PRINT HELPER -->
+<div class="no-print" style="position:fixed;bottom:20px;right:20px;background:var(--blue);color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(45,91,227,.35);font-size:8.5pt;z-index:9999;line-height:1.5">
+  <strong>📄 Print to PDF:</strong><br>
+  Tekan <kbd style="background:rgba(255,255,255,.2);padding:1px 4px;border-radius:3px">Ctrl+P</kbd> →<br>
+  Pilih <em>Save as PDF</em><br>
+  ✅ Aktifkan <em>Background graphics</em>
+</div>
+
+</body>
+</html>

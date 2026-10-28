@@ -1,0 +1,15 @@
+@startuml wb_03_dn_flowchart
+start
+if (deviationPct == null?) then (ya)
+  :return false;
+  stop
+else (tidak)
+  :v = |deviationPct| dibulatkan 4 desimal;
+  if (v > 15?) then (ya)
+    :return true;
+  else (tidak)
+    :return false;
+  endif
+  stop
+endif
+@enduml

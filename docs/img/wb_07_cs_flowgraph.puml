@@ -1,0 +1,26 @@
+@startuml wb_07_cs_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle "1" as n1
+circle "2" as n2
+circle "3" as n3
+circle "4" as n4
+circle "5" as n5
+circle "6" as n6
+n1 --> n2
+n1 --> n3
+n3 --> n4
+n3 --> n5
+n2 --> n6
+n4 --> n6
+n5 --> n6
+legend right
+  1: null?
+  2: return ''
+  3: perlu kutip?
+  4: return kutip
+  5: return s
+  6: exit
+endlegend
+@enduml

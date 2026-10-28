@@ -1,0 +1,36 @@
+@startuml wb_06_rg_flowchart
+start
+if (path == /dev/gallery?) then (ya)
+  if (kDebugMode?) then (ya)
+    :return null;
+  else (tidak)
+    :return /splash;
+  endif
+  stop
+elseif (path == /splash?) then (ya)
+  :return null;
+  stop
+else (tidak)
+  switch (auth.status)
+  case (unknown)
+    :return /splash;
+  case (signedOut)
+    if (rute publik?) then (ya)
+      :return null;
+    elseif (sessionExpired?) then (ya)
+      :return /login?expired=1;
+    else (tidak)
+      :return /login;
+    endif
+  case (signedIn)
+    if (path == /login atau /login/lupa?) then (ya)
+      :return /beranda;
+    elseif (AccessMatrix.canOpen?) then (ya)
+      :return null;
+    else (tidak)
+      :return /beranda;
+    endif
+  endswitch
+  stop
+endif
+@enduml

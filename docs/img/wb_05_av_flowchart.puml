@@ -1,0 +1,22 @@
+@startuml wb_05_av_flowchart
+start
+:t = text.trim();
+if (t kosong?) then (ya)
+  :return "Actual inbound wajib diisi.";
+  stop
+elseif (diawali "-" atau "−"?) then (ya)
+  :return "Nilai tidak boleh negatif.";
+  stop
+elseif (bukan pola [0-9.]+?) then (ya)
+  :return "Masukkan angka bulat…";
+  stop
+else (tidak)
+  :cleaned = hapus titik;
+  if (cleaned kosong atau tryParse null?) then (ya)
+    :return "Masukkan angka bulat…";
+  else (tidak)
+    :return null (valid);
+  endif
+  stop
+endif
+@enduml

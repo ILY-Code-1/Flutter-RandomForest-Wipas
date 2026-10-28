@@ -1,0 +1,228 @@
+@startuml lrs_transformasi
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide circle
+hide methods
+skinparam linetype ortho
+left to right direction
+class Warehouse <<Table>> {
+  + wh_id : VARCHAR
+  - name : VARCHAR
+  - city : VARCHAR
+}
+class AppUser <<Table>> {
+  + uid : VARCHAR
+  # wh_id : VARCHAR
+  - display_name : VARCHAR
+  - email : VARCHAR
+  - role : VARCHAR
+  - job_title : VARCHAR
+}
+class DailyData <<Table>> {
+  + daily_id : VARCHAR
+  # wh_id : VARCHAR
+  - date : DATE
+  - day_of_week : SMALLINT
+  - month : SMALLINT
+  - is_campaign : BOOLEAN
+  - is_holiday : BOOLEAN
+  - is_payday : BOOLEAN
+  - pickup_request_h1 : INTEGER
+  - projection_inbound : INTEGER
+  - backlog_h1 : INTEGER
+  - actual_inbound_h2 : INTEGER
+  - actual_inbound_h1 : INTEGER
+  - actual_inbound : INTEGER
+  - source_file : VARCHAR
+}
+class Prediction <<Table>> {
+  + pred_id : VARCHAR
+  # wh_id : VARCHAR
+  # actual_input_by : VARCHAR
+  - target_date : DATE
+  - predicted : INTEGER
+  - projection : INTEGER
+  - deviation_pct : DECIMAL
+  - alert : BOOLEAN
+  - status : VARCHAR
+  - data_status : VARCHAR
+  - source : VARCHAR
+  - model_version : VARCHAR
+  - generated_at : TIMESTAMP
+  - feat_day_of_week : SMALLINT
+  - feat_month : SMALLINT
+  - feat_is_campaign : BOOLEAN
+  - feat_is_holiday : BOOLEAN
+  - feat_is_payday : BOOLEAN
+  - feat_pickup_request_h1 : INTEGER
+  - feat_projection_inbound : INTEGER
+  - feat_backlog_h1 : INTEGER
+  - feat_actual_inbound_h2 : INTEGER
+  - feat_actual_inbound_h1 : INTEGER
+  - is_backfill : BOOLEAN
+  - actual_inbound : INTEGER
+  - actual_note : VARCHAR
+  - actual_input_at : TIMESTAMP
+  - daily_error_pct : DECIMAL
+  - evaluated : BOOLEAN
+}
+class ManpowerRecommendation <<Table>> {
+  + pred_id : VARCHAR {FK}
+  - rider : INTEGER
+  - driver : INTEGER
+  - op_inbound : INTEGER
+  - op_outbound : INTEGER
+  - snap_capacity_rider : DECIMAL
+  - snap_capacity_driver : DECIMAL
+  - snap_capacity_op_inbound : DECIMAL
+  - snap_capacity_op_outbound : DECIMAL
+  - snap_ratio_rider : DECIMAL
+  - snap_ratio_driver : DECIMAL
+}
+class PredictionFeatureImportance <<Table>> {
+  + pred_id : VARCHAR {FK}
+  + feature_name : VARCHAR
+  - importance : DECIMAL
+}
+class OperationalConfig <<Table>> {
+  + wh_id : VARCHAR {FK}
+  # updated_by : VARCHAR
+  - capacity_rider : DECIMAL
+  - capacity_driver : DECIMAL
+  - capacity_op_inbound : DECIMAL
+  - capacity_op_outbound : DECIMAL
+  - ratio_rider : DECIMAL
+  - ratio_driver : DECIMAL
+  - rounding : VARCHAR
+  - updated_at : TIMESTAMP
+}
+class ConfigHistory <<Table>> {
+  + history_id : VARCHAR
+  # wh_id : VARCHAR
+  # changed_by : VARCHAR
+  - changed_by_name : VARCHAR
+  - changed_at : TIMESTAMP
+}
+class ConfigHistoryDetail <<Table>> {
+  + history_id : VARCHAR {FK}
+  + field_name : VARCHAR
+  - old_value : DECIMAL
+  - new_value : DECIMAL
+}
+class DecisionLog <<Table>> {
+  + decision_id : VARCHAR
+  # pred_id : VARCHAR
+  # wh_id : VARCHAR
+  # decided_by : VARCHAR
+  - decided_by_name : VARCHAR
+  - decision : VARCHAR
+  - rider_final : INTEGER
+  - driver_final : INTEGER
+  - op_inbound_final : INTEGER
+  - op_outbound_final : INTEGER
+  - reason : VARCHAR
+  - decided_at : TIMESTAMP
+}
+class ModelHealth <<Table>> {
+  + wh_id : VARCHAR {FK}
+  - status : VARCHAR
+  - rolling_mae_7d : DECIMAL
+  - baseline_mae : DECIMAL
+  - drift_threshold : DECIMAL
+  - model_version : VARCHAR
+  - mae_validation : DECIMAL
+  - rmse : DECIMAL
+  - r2 : DECIMAL
+  - updated_at : TIMESTAMP
+}
+class ModelHealthHistory <<Table>> {
+  + history_key : VARCHAR
+  # wh_id : VARCHAR
+  - date : DATE
+  - rolling_mae_7d : DECIMAL
+  - baseline_mae : DECIMAL
+  - drift_threshold : DECIMAL
+  - status : VARCHAR
+}
+class BatchLog <<Table>> {
+  + batch_id : VARCHAR
+  # wh_id : VARCHAR
+  - run_date : DATE
+  - target_date : DATE
+  - started_at : TIMESTAMP
+  - finished_at : TIMESTAMP
+  - duration_sec : INTEGER
+  - status : VARCHAR
+  - retry_count : SMALLINT
+  - source : VARCHAR
+  - message : VARCHAR
+}
+class DatasetStatus <<Table>> {
+  + wh_id : VARCHAR {FK}
+  - last_import_at : TIMESTAMP
+  - range_start : DATE
+  - range_end : DATE
+  - row_count : INTEGER
+  - source_file : VARCHAR
+}
+class Notification <<Table>> {
+  + notif_id : VARCHAR
+  # wh_id : VARCHAR
+  - type : VARCHAR
+  - title : VARCHAR
+  - body : VARCHAR
+  - target_date : DATE
+  - created_at : TIMESTAMP
+}
+class NotificationAudience <<Table>> {
+  + notif_id : VARCHAR {FK}
+  + role : VARCHAR
+}
+class NotificationRead <<Table>> {
+  + uid : VARCHAR {FK}
+  + notif_id : VARCHAR {FK}
+  - read_at : TIMESTAMP
+}
+Warehouse "1" --> "N" AppUser : menaungi
+Warehouse "1" --> "N" DailyData : mencatat
+Warehouse "1" --> "N" Prediction : memiliki
+Warehouse "1" --> "1" OperationalConfig : diatur oleh
+Warehouse "1" --> "0..1" ModelHealth : dipantau oleh
+Warehouse "1" --> "N" ModelHealthHistory : merekam
+Warehouse "1" --> "N" BatchLog : menjalankan
+Warehouse "1" --> "0..1" DatasetStatus : diringkas oleh
+Warehouse "1" --> "N" Notification : menerbitkan
+Warehouse "1" --> "N" ConfigHistory : mengaudit
+Warehouse "1" --> "N" DecisionLog : mencatat keputusan
+Prediction "1" --> "0..1" ManpowerRecommendation : menghasilkan
+Prediction "1" --> "N" PredictionFeatureImportance : dijelaskan oleh
+Prediction "1" --> "N" DecisionLog : diputuskan melalui
+AppUser "1" --> "N" DecisionLog : membuat
+AppUser "0..1" --> "N" Prediction : menginput actual
+AppUser "1" --> "N" OperationalConfig : memperbarui
+AppUser "1" --> "N" ConfigHistory : mengubah
+ConfigHistory "1" --> "N" ConfigHistoryDetail : terdiri atas
+Notification "1" --> "N" NotificationAudience : ditujukan ke
+AppUser "1" --> "N" NotificationRead : membaca
+Notification "1" --> "N" NotificationRead : dibaca dalam
+note bottom of ManpowerRecommendation
+  1:1 embed manpower → tabel terpisah,
+  PK = FK pred_id
+end note
+note bottom of PredictionFeatureImportance
+  atribut multinilai feature_importance
+  → tabel, PK komposit
+end note
+note bottom of ConfigHistoryDetail
+  weak entity: map old/new_values
+  → PK (history_id, field_name)
+end note
+note bottom of NotificationAudience
+  array audience_roles → tabel,
+  PK (notif_id, role)
+end note
+note bottom of NotificationRead
+  M:N AppUser–Notification
+  → tabel junction
+end note
+@enduml

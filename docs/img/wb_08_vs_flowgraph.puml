@@ -1,0 +1,44 @@
+@startuml wb_08_vs_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle "1" as n1
+circle "2" as n2
+circle "3" as n3
+circle "4" as n4
+circle "5" as n5
+circle "6" as n6
+circle "7" as n7
+circle "8" as n8
+circle "9" as n9
+circle "10" as n10
+circle "11" as n11
+n1 --> n2
+n1 --> n8
+n2 --> n3
+n2 --> n5
+n3 --> n4
+n3 --> n5
+n5 --> n6
+n5 --> n7
+n8 --> n9
+n8 --> n10
+n4 --> n11
+n6 --> n11
+n7 --> n11
+n9 --> n11
+n10 --> n11
+legend right
+  1: hasValue?
+  2: isEmpty != null?
+  3: isEmpty(data)?
+  4: Empty
+  5: offline?
+  6: Offline
+  7: Data
+  8: hasError?
+  9: Error
+  10: Loading
+  11: exit
+endlegend
+@enduml

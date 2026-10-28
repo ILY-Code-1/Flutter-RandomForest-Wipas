@@ -1,0 +1,21 @@
+@startuml wb_04_cv_flowchart
+start
+:errors = {};
+while (masih ada entri values?) is (ya)
+  if (v == null?) then (ya)
+    :errors[key] = "Wajib diisi dengan angka.";
+  elseif (v <= 0?) then (ya)
+    :errors[key] = "Nilai harus lebih dari 0.";
+  else (tidak)
+  endif
+endwhile (tidak)
+if (ratio_rider != null?) then (ya)
+  if (ratio_driver != null?) then (ya)
+    if (|rr + rd − 1| > 0,001?) then (ya)
+      :ratioError = msgRatio(sum);
+    endif
+  endif
+endif
+:return ConfigValidation(errors, ratioError);
+stop
+@enduml

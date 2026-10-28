@@ -1,0 +1,15 @@
+@startuml wb_01_mp_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle "1" as n1
+circle "2" as n2
+circle "3" as n3
+n1 --> n2
+n2 --> n3
+legend right
+  1: p = toDouble
+  2: 4 × _ceil (tanpa cabang)
+  3: return
+endlegend
+@enduml

@@ -1,0 +1,353 @@
+' == Sequence: UC01 Login ==
+@startuml seq_UC01
+autoactivate off
+actor Pengguna
+boundary LoginScreen
+control AuthController
+entity users
+Pengguna -> LoginScreen : isi email & password, tekan Masuk
+activate LoginScreen
+LoginScreen -> AuthController : signIn(email, password)
+activate AuthController
+AuthController -> users : get(users/{uid})
+activate users
+users --> AuthController : role, display_name, wh_id
+deactivate users
+alt akun valid dan role dikenal
+  AuthController --> LoginScreen : AuthState signedIn
+  LoginScreen --> Pengguna : buka /beranda (roleGuard)
+else kredensial salah
+  AuthController --> LoginScreen : AuthFailure
+  LoginScreen --> Pengguna : "Email atau password salah"
+end
+deactivate AuthController
+deactivate LoginScreen
+@enduml
+
+' == Sequence: UC02 Reset Kata Sandi ==
+@startuml seq_UC02
+actor Pengguna
+boundary ForgotPasswordScreen
+control AuthController
+entity "Firebase Auth" as FirebaseAuth
+Pengguna -> ForgotPasswordScreen : isi email, tekan Kirim tautan reset
+activate ForgotPasswordScreen
+alt format email valid
+  ForgotPasswordScreen -> AuthController : sendPasswordReset(email)
+  activate AuthController
+  AuthController -> FirebaseAuth : sendPasswordResetEmail(email)
+  activate FirebaseAuth
+  FirebaseAuth --> AuthController : terkirim
+  deactivate FirebaseAuth
+  AuthController --> ForgotPasswordScreen : selesai
+  deactivate AuthController
+  ForgotPasswordScreen --> Pengguna : "Tautan reset telah dikirim ke email"
+else email tidak valid
+  ForgotPasswordScreen --> Pengguna : "Masukkan email yang valid"
+end
+deactivate ForgotPasswordScreen
+@enduml
+
+' == Sequence: UC03 Melihat Beranda ==
+@startuml seq_UC03
+actor Pengguna
+boundary BerandaScreen
+control dashboardProvider
+entity predictions
+Pengguna -> BerandaScreen : buka tab Beranda
+activate BerandaScreen
+BerandaScreen -> dashboardProvider : watch()
+activate dashboardProvider
+dashboardProvider -> predictions : query wh_id, target_date ≤ H+1, limit 30
+activate predictions
+predictions --> dashboardProvider : daftar Prediction (+ model_health)
+deactivate predictions
+dashboardProvider --> BerandaScreen : ViewState (Data / Empty / Offline)
+deactivate dashboardProvider
+opt deviasi > 15% atau model degraded
+  BerandaScreen -> BerandaScreen : tampilkan WipasAlertBanner
+end
+BerandaScreen --> Pengguna : KPI, tren 14 hari, kartu sesuai role
+deactivate BerandaScreen
+@enduml
+
+' == Sequence: UC04 Melihat Prediksi H+1/H+2 ==
+@startuml seq_UC04
+actor Pengguna
+boundary PrediksiScreen
+control dashboardProvider
+entity predictions
+Pengguna -> PrediksiScreen : buka Prediksi, pilih H+1/H+2
+activate PrediksiScreen
+PrediksiScreen -> dashboardProvider : watch()
+activate dashboardProvider
+dashboardProvider -> predictions : query 30 hari terakhir
+activate predictions
+predictions --> dashboardProvider : daftar Prediction
+deactivate predictions
+dashboardProvider --> PrediksiScreen : DashboardData
+deactivate dashboardProvider
+alt prediksi tanggal terpilih ada
+  PrediksiScreen --> Pengguna : target, tabel/grafik, input model, faktor pendorong*
+else tidak ada
+  PrediksiScreen --> Pengguna : "Belum ada prediksi untuk tanggal terpilih"
+end
+deactivate PrediksiScreen
+@enduml
+
+' == Sequence: UC05 Melihat Rekomendasi Manpower ==
+@startuml seq_UC05
+actor Pengguna
+boundary ManpowerScreen
+control manpowerDataProvider
+entity predictions
+Pengguna -> ManpowerScreen : buka tab Manpower
+activate ManpowerScreen
+ManpowerScreen -> manpowerDataProvider : watch()
+activate manpowerDataProvider
+manpowerDataProvider -> predictions : prediksi terbaru (+ operational_configs, decision_logs)
+activate predictions
+predictions --> manpowerDataProvider : manpower, config_snapshot, keputusan
+deactivate predictions
+manpowerDataProvider --> ManpowerScreen : ManpowerData
+deactivate manpowerDataProvider
+ManpowerScreen --> Pengguna : 4 kategori + status keputusan
+opt tekan "Cara hitung"
+  ManpowerScreen --> Pengguna : sheet rumus & substitusi angka
+end
+deactivate ManpowerScreen
+@enduml
+
+' == Sequence: UC06 Menyetujui Rekomendasi ==
+@startuml seq_UC06
+actor "Admin/Manajer" as User
+boundary ManpowerScreen
+control WipasRepository
+entity decision_logs
+User -> ManpowerScreen : tekan "Setujui rekomendasi"
+activate ManpowerScreen
+ManpowerScreen --> User : dialog "Setujui rekomendasi?"
+alt pilih Setujui (online)
+  User -> ManpowerScreen : Setujui
+  ManpowerScreen -> WipasRepository : addDecision(approved, manpowerFinal)
+  activate WipasRepository
+  WipasRepository -> decision_logs : add({decision: approved, decided_by})
+  activate decision_logs
+  decision_logs --> WipasRepository : tersimpan
+  deactivate decision_logs
+  WipasRepository --> ManpowerScreen : selesai
+  deactivate WipasRepository
+  ManpowerScreen --> User : status Disetujui + SnackBar
+else Batal
+  ManpowerScreen --> User : tetap Menunggu persetujuan
+end
+deactivate ManpowerScreen
+@enduml
+
+' == Sequence: UC07 Menyesuaikan Manpower Manual ==
+@startuml seq_UC07
+actor "Admin/Manajer" as User
+boundary AdjustSheet
+control WipasRepository
+entity decision_logs
+User -> AdjustSheet : ubah jumlah, isi alasan, Simpan penyesuaian
+activate AdjustSheet
+alt alasan diisi
+  AdjustSheet -> WipasRepository : addDecision(adjusted, manpowerFinal, reason)
+  activate WipasRepository
+  WipasRepository -> decision_logs : add({decision: adjusted, reason})
+  activate decision_logs
+  decision_logs --> WipasRepository : tersimpan
+  deactivate decision_logs
+  WipasRepository --> AdjustSheet : selesai
+  deactivate WipasRepository
+  AdjustSheet --> User : status Disesuaikan manual
+else alasan kosong
+  AdjustSheet --> User : "Alasan wajib diisi."
+end
+deactivate AdjustSheet
+@enduml
+
+' == Sequence: UC08 Melihat Evaluasi Model ==
+@startuml seq_UC08
+actor Pengguna
+boundary EvaluasiScreen
+control evaluasiDataProvider
+entity model_health
+Pengguna -> EvaluasiScreen : buka tab Evaluasi
+activate EvaluasiScreen
+EvaluasiScreen -> evaluasiDataProvider : watch()
+activate evaluasiDataProvider
+evaluasiDataProvider -> model_health : model_health, history, batch_logs, dataset_status
+activate model_health
+model_health --> evaluasiDataProvider : ModelHealth, ModelHealthPoint[], BatchLog, DatasetStatus
+deactivate model_health
+evaluasiDataProvider --> EvaluasiScreen : EvaluasiData
+deactivate evaluasiDataProvider
+EvaluasiScreen --> Pengguna : kesehatan, Rolling MAE, metrik, batch, dataset
+opt status degraded
+  EvaluasiScreen --> Pengguna : saran retraining + "Lihat feature importance"
+end
+deactivate EvaluasiScreen
+@enduml
+
+' == Sequence: UC09 Input Actual Inbound ==
+@startuml seq_UC09
+actor "Admin/Supervisor" as User
+boundary InputActualScreen
+control ActualValidator
+entity predictions
+User -> InputActualScreen : isi actual, tekan Simpan
+activate InputActualScreen
+InputActualScreen -> ActualValidator : validate(text)
+activate ActualValidator
+ActualValidator --> InputActualScreen : null / pesan galat
+deactivate ActualValidator
+alt valid
+  InputActualScreen -> predictions : update actual_inbound, actual_note, actual_input_by, actual_input_at
+  activate predictions
+  predictions --> InputActualScreen : tersimpan
+  deactivate predictions
+  InputActualScreen --> User : perbandingan + dampak Rolling MAE + SnackBar
+else kosong / negatif
+  InputActualScreen --> User : pesan galat di field
+end
+deactivate InputActualScreen
+@enduml
+
+' == Sequence: UC10 Mengatur Konfigurasi Kapasitas ==
+@startuml seq_UC10
+actor "Admin/Manajer" as User
+boundary KonfigurasiScreen
+control ConfigValidator
+entity operational_configs
+User -> KonfigurasiScreen : ubah kapasitas / rasio
+activate KonfigurasiScreen
+KonfigurasiScreen -> ConfigValidator : validate(values)
+activate ConfigValidator
+ConfigValidator --> KonfigurasiScreen : ConfigValidation
+deactivate ConfigValidator
+alt valid dan dikonfirmasi
+  KonfigurasiScreen -> operational_configs : transaksi update + config_history
+  activate operational_configs
+  operational_configs --> KonfigurasiScreen : tersimpan
+  deactivate operational_configs
+  KonfigurasiScreen --> User : SnackBar + riwayat baru
+else rasio ≠ 1,00 atau nilai ≤ 0
+  KonfigurasiScreen --> User : pesan galat, Simpan nonaktif
+end
+deactivate KonfigurasiScreen
+@enduml
+
+' == Sequence: UC11 Melihat Riwayat dan Log Keputusan ==
+@startuml seq_UC11
+actor Pengguna
+boundary RiwayatScreen
+control riwayatDataProvider
+entity predictions
+Pengguna -> RiwayatScreen : buka Riwayat, pilih 7/14 hari
+activate RiwayatScreen
+RiwayatScreen -> riwayatDataProvider : watch()
+activate riwayatDataProvider
+riwayatDataProvider -> predictions : query rentang tanggal (+ decision_logs bila bukan Viewer)
+activate predictions
+predictions --> riwayatDataProvider : Prediction[], DecisionLog[]
+deactivate predictions
+riwayatDataProvider --> RiwayatScreen : RiwayatData
+deactivate riwayatDataProvider
+RiwayatScreen --> Pengguna : daftar harian + badge Perlu Perhatian (+ keputusan)
+deactivate RiwayatScreen
+@enduml
+
+' == Sequence: UC12 Export CSV Riwayat ==
+@startuml seq_UC12
+actor Admin
+boundary RiwayatScreen
+control CsvExport
+entity "Berkas CSV" as CsvFile
+Admin -> RiwayatScreen : tekan Export CSV
+activate RiwayatScreen
+RiwayatScreen -> CsvExport : build(rows, decisions)
+activate CsvExport
+CsvExport --> RiwayatScreen : teks CSV (BOM UTF-8)
+deactivate CsvExport
+RiwayatScreen -> CsvFile : CsvSaver.write(fileName, csv)
+activate CsvFile
+alt berhasil
+  CsvFile --> RiwayatScreen : File
+  RiwayatScreen --> Admin : "File siap diunduh" + bagikan
+else gagal
+  CsvFile --> RiwayatScreen : FileSystemException
+  RiwayatScreen --> Admin : "Export gagal" + Coba lagi
+end
+deactivate CsvFile
+deactivate RiwayatScreen
+@enduml
+
+' == Sequence: UC13 Mengelola Notifikasi ==
+@startuml seq_UC13
+actor Pengguna
+boundary NotifikasiScreen
+control WipasRepository
+entity notifications
+Pengguna -> NotifikasiScreen : buka notifikasi
+activate NotifikasiScreen
+NotifikasiScreen -> WipasRepository : watchNotifications(role)
+activate WipasRepository
+WipasRepository -> notifications : audience_roles array-contains role, limit 30
+activate notifications
+notifications --> WipasRepository : AppNotification[]
+deactivate notifications
+WipasRepository --> NotifikasiScreen : daftar + status baca
+NotifikasiScreen --> Pengguna : daftar sesuai filter
+Pengguna -> NotifikasiScreen : Tandai semua dibaca / ketuk notifikasi
+NotifikasiScreen -> WipasRepository : markRead(uid, ids)
+WipasRepository --> NotifikasiScreen : notification_reads tersimpan
+deactivate WipasRepository
+deactivate NotifikasiScreen
+@enduml
+
+' == Sequence: UC14 Melihat Profil dan Keluar ==
+@startuml seq_UC14
+actor Pengguna
+boundary ProfilScreen
+control AuthController
+entity "Firebase Auth" as FirebaseAuth
+Pengguna -> ProfilScreen : buka Profil & pengaturan
+activate ProfilScreen
+ProfilScreen --> Pengguna : info akun, pengaturan, versi
+Pengguna -> ProfilScreen : tekan Keluar
+ProfilScreen --> Pengguna : dialog "Keluar dari WIPAS?"
+opt pilih Keluar
+  ProfilScreen -> AuthController : signOut()
+  activate AuthController
+  AuthController -> FirebaseAuth : signOut()
+  FirebaseAuth --> AuthController : selesai
+  AuthController --> ProfilScreen : AuthState signedOut
+  deactivate AuthController
+  ProfilScreen --> Pengguna : halaman Login
+end
+deactivate ProfilScreen
+@enduml
+
+' == Sequence: UC15 Menjalankan Batch Prediksi ==
+@startuml seq_UC15
+actor "Script Batch Prediksi" as Script
+boundary "wipas predict" as Cli
+control predict
+entity Firestore
+Script -> Cli : jalankan (jadwal 23:00 WIB / manual)
+activate Cli
+Cli -> predict : run(target_date = H+1)
+activate predict
+predict -> predict : siapkan fitur (fallback H-2 bila H-1 kosong)
+predict -> Firestore : tulis predictions/pred_{wh}_{YYYYMMDD} (+manpower)
+activate Firestore
+predict -> Firestore : tulis model_health, batch_logs, notifications
+Firestore --> predict : tersimpan
+deactivate Firestore
+predict --> Cli : ringkasan batch
+deactivate predict
+Cli --> Script : selesai (exit 0)
+deactivate Cli
+@enduml

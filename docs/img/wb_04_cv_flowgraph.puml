@@ -1,0 +1,48 @@
+@startuml wb_04_cv_flowgraph
+skinparam defaultFontName Arial
+skinparam shadowing false
+top to bottom direction
+circle "1" as n1
+circle "2" as n2
+circle "3" as n3
+circle "4" as n4
+circle "5" as n5
+circle "6" as n6
+circle "7" as n7
+circle "8" as n8
+circle "9" as n9
+circle "10" as n10
+circle "11" as n11
+circle "12" as n12
+n1 --> n2
+n2 --> n3
+n2 --> n8
+n3 --> n4
+n3 --> n5
+n4 --> n7
+n5 --> n6
+n5 --> n7
+n6 --> n7
+n7 --> n2
+n8 --> n9
+n8 --> n12
+n9 --> n10
+n9 --> n12
+n10 --> n11
+n10 --> n12
+n11 --> n12
+legend right
+  1: errors = {}
+  2: ada entri?
+  3: v == null?
+  4: err kosong
+  5: v <= 0?
+  6: err > 0
+  7: lanjut
+  8: rr != null?
+  9: rd != null?
+  10: |sum−1| > tol?
+  11: ratioError
+  12: return
+endlegend
+@enduml

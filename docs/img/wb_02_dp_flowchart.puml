@@ -1,0 +1,16 @@
+@startuml wb_02_dp_flowchart
+start
+if (predicted == null?) then (ya)
+  :return null;
+  stop
+elseif (projection == null?) then (ya)
+  :return null;
+  stop
+elseif (projection <= 0?) then (ya)
+  :return null;
+  stop
+else (tidak)
+  :return (predicted − projection) / projection × 100;
+  stop
+endif
+@enduml

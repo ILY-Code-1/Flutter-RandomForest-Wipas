@@ -1,0 +1,92 @@
+@startuml db_object
+skinparam defaultFontName Arial
+skinparam shadowing false
+left to right direction
+object "warehouses/WH-CKG-01" as w {
+  name = "Hub Cakung"
+  city = "Jakarta Timur"
+}
+object "users/uid-manajer" as u {
+  display_name = "Budi Santoso"
+  role = "manajer"
+  wh_id = "WH-CKG-01"
+  job_title = "Manajer Warehouse"
+}
+object "notification_reads/deviation_WH-CKG-01_20261004" as nr {
+  read_at = 2026-10-03T16:02Z
+}
+object "daily_data/WH-CKG-01_20261008" as d {
+  date = "2026-10-08"
+  projection_inbound = 16200
+  actual_inbound = 17560
+  backlog_h1 = 512
+}
+object "predictions/pred_WH-CKG-01_20261009" as p {
+  target_date = "2026-10-09"
+  predicted = 18420
+  projection = 15900
+  deviation_pct = 15.8
+  alert = true
+  data_status = "complete"
+  manpower = {rider: 37, driver: 7, op_inbound: 37, op_outbound: 31}
+  actual_inbound = null
+}
+object "operational_configs/WH-CKG-01" as c {
+  capacity_rider = 350
+  capacity_driver = 800
+  ratio_rider = 0.7
+  ratio_driver = 0.3
+  updated_by = "uid-manajer"
+}
+object "config_history/seed_1" as h {
+  changed_by = "uid-manajer"
+  old_values = {capacity_op_outbound: 580}
+  new_values = {capacity_op_outbound: 600}
+}
+object "decision_logs/Rz8TnB4cWq" as dl {
+  pred_id = "pred_WH-CKG-01_20261009"
+  decided_by = "uid-manajer"
+  decision = "approved"
+  reason = null
+}
+object "model_health/WH-CKG-01" as mh {
+  status = "healthy"
+  rolling_mae_7d = 6.8
+  baseline_mae = 6.2
+  drift_threshold = 7.13
+}
+object "model_health_history/WH-CKG-01_20261008" as mhh {
+  date = "2026-10-08"
+  rolling_mae_7d = 6.8
+}
+object "batch_logs/WH-CKG-01_20261008" as b {
+  status = "success"
+  duration_sec = 134
+  retry_count = 0
+  source = "H-1"
+}
+object "dataset_status/WH-CKG-01" as ds {
+  range_start = "2025-01-01"
+  range_end = "2026-10-08"
+  row_count = 646
+}
+object "notifications/deviation_WH-CKG-01_20261009" as n {
+  type = "deviation"
+  audience_roles = [admin, manajer, supervisor, viewer]
+}
+u --> w : wh_id
+p --> w : wh_id
+d --> w : wh_id
+c --> w : id = wh
+c --> u : updated_by
+h --> u : changed_by
+dl --> p : pred_id
+dl --> u : decided_by
+mh --> w : id = wh
+mhh --> w : wh_id
+b --> w : wh_id
+ds --> w : id = wh
+n --> w : wh_id
+u --> nr : sub-koleksi
+nr --> n : id = notifId
+@enduml
