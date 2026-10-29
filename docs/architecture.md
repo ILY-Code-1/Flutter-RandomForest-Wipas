@@ -5,10 +5,10 @@
  wipas-research (Python, Admin SDK)            wipas-app (Flutter, Android)
  ─ impor Excel → daily_data                    ─ membaca: predictions, model_health*,
  ─ batch RF → predictions (+manpower)             batch_logs, dataset_status, notifications,
- ─ evaluasi → model_health(_history)              operational_configs, config_history, decision_logs
+ ─ evaluasi → model_health(_history)              operational_configs(+/history), decision_logs
  ─ batch_logs, dataset_status, notifications   ─ menulis: actual_*, decision_logs,
-                 │                                 operational_configs + config_history,
-                 ▼                                 users/{uid}/notification_reads
+                 │                                 operational_configs + /history, decision_* di predictions,
+                 ▼                                 notifications.read_by
           Cloud Firestore (Spark) ◄──────────── security rules (firebase/firestore.rules)
 ```
 Tidak ada Cloud Functions; tidak ada push. Selama pengembangan semuanya berjalan di Firebase Emulator (`demo-wipas`).

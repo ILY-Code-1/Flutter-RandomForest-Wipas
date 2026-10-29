@@ -9,11 +9,36 @@
       ]
     },
     {
+      "collectionGroup": "predictions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "wh_id", "order": "ASCENDING" },
+        { "fieldPath": "evaluated", "order": "ASCENDING" },
+        { "fieldPath": "target_date", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "model_health_history",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "wh_id", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" }
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "wh_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "audience_roles", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
     },
     {
@@ -28,7 +53,7 @@
       "collectionGroup": "decision_logs",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "pred_id", "order": "ASCENDING" },
+        { "fieldPath": "prediction_id", "order": "ASCENDING" },
         { "fieldPath": "decided_at", "order": "DESCENDING" }
       ]
     },
@@ -38,22 +63,6 @@
       "fields": [
         { "fieldPath": "wh_id", "order": "ASCENDING" },
         { "fieldPath": "decided_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "config_history",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "wh_id", "order": "ASCENDING" },
-        { "fieldPath": "changed_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "notifications",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "audience_roles", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
     }
   ],

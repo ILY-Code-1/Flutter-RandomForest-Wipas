@@ -68,7 +68,7 @@ Password semua: `wipas-demo-123` (hanya di emulator, dibuat oleh seed).
 
 ## Asumsi
 Lihat `ASSUMPTIONS.md` (27 butir + catatan ketidakkonsistenan BRD). Yang paling berdampak ke repo riset:
-- `docs/firestore_schema.md` **dibuat di repo ini**; field bertanda [USULAN] (`model_health_history`, `batch_logs`, `dataset_status`, `warehouses`, `users.job_title`, format tanggal `YYYY-MM-DD` WIB, `day_of_week` 1 = Senin) harus diterapkan juga di `wipas-research`.
+- `docs/firestore_schema.md` kini **berasal dari repo riset** (kontrak v1.0) dan aplikasi telah diselaraskan; lihat `docs/SYNC_REPORT.md`. Catatan lama: berkas sebelumnya dibuat di repo ini; field bertanda [USULAN] (`model_health_history`, `batch_logs`, `dataset_status`, `warehouses`, `users.job_title`, format tanggal `YYYY-MM-DD` WIB, `day_of_week` 1 = Senin) harus diterapkan juga di `wipas-research`.
 - Selisih desain: `docs/design_deviations.md`; kesesuaian per layar: `docs/design_parity.md`.
 
 ## Masalah terbuka
@@ -109,7 +109,7 @@ Lihat `ASSUMPTIONS.md` (27 butir + catatan ketidakkonsistenan BRD). Yang paling 
    6. `flutterfire configure --project=<project-id> --platforms=android` (menimpa `lib/firebase_options.dart`, membuat `android/app/google-services.json` — sudah di-ignore).
    7. `firebase deploy --only firestore:rules,firestore:indexes --project <project-id>`
    8. Console → Authentication → Add user (Shift Lead + akun demo). Catat UID.
-   9. Console → Firestore: buat `users/<UID>` (`display_name`, `email`, `role`, `wh_id`=`WH-CKG-01`, `job_title` opsional), `warehouses/WH-CKG-01` (`name`=`Hub Cakung`), `operational_configs/WH-CKG-01` (350/800/500/600, 0.7/0.3, `rounding`=`ceil`).
+   9. Console → Firestore: buat `users/<UID>` (`name`, `role` = `admin`/`manager`/`supervisor`/`viewer`), `warehouses/WH-CKG-01` (`name`=`Hub Cakung`), `operational_configs/WH-CKG-01` (350/800/500/600, 0.7/0.3, `rounding`=`ceil`).
    10. Sinkronkan `docs/firestore_schema.md` ke repo `wipas-research`, jalankan impor Excel + batch prediksi di sana agar `predictions`, `model_health`, `batch_logs`, `dataset_status`, `notifications` terisi.
    11. `flutter build apk --release --dart-define=USE_EMULATOR=false`
 7. **(Opsional) kunci rilis:** `keytool -genkey -v -keystore %USERPROFILE%\wipas-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias wipas`, buat `android/key.properties` (di-ignore) dan konfigurasikan `signingConfigs` di `android/app/build.gradle.kts`.

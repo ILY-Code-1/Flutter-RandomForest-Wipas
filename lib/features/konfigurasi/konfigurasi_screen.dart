@@ -117,7 +117,8 @@ class _KonfigurasiScreenState extends ConsumerState<KonfigurasiScreen> {
     if (!ok || !mounted) return;
     setState(() => _saving = true);
     try {
-      await ref.read(repositoryProvider).saveConfig(newValues: next, uid: user.uid, name: user.displayName);
+      await ref.read(repositoryProvider).saveConfig(
+          newValues: next, uid: user.uid, name: user.displayName, note: changes.join('; '));
       if (mounted) {
         _loaded = next;
         showWipasSnackBar(context, 'Konfigurasi tersimpan dan dicatat di riwayat.');
@@ -319,13 +320,15 @@ class _HistoryCard extends StatelessWidget {
                   Text(h.changedByName, style: WipasText.body.copyWith(fontWeight: FontWeight.w700)),
                   Text(h.changedAt == null ? 'menyinkronkan…' : Fmt.logTime(h.changedAt!),
                       style: WipasText.bodySmall.copyWith(color: WipasColors.textSecondary)),
-                  for (final k in _historyLabels.keys)
-                    if (h.newValues[k] != null && h.oldValues[k] != h.newValues[k])
-                      Text(
-                        '${_historyLabels[k]}: ${h.oldValues[k] == null ? '—' : _fmtValue(k, h.oldValues[k]!)} → '
-                        '${_fmtValue(k, h.newValues[k]!)}',
-                        style: WipasText.body,
-                      ),
+                  // `note` holds "Label: lama → baru; …" written at save time.
+                  if ((h.note ?? '').isNotEmpty)
+                    for (final line in h.note!.split('; ')) Text(line, style: WipasText.body)
+                  else
+                    Text(
+                      [for (final k in _historyLabels.keys) if (h.values[k] != null) '${_historyLabels[k]} ${_fmtValue(k, h.values[k]!)}']
+                          .join(' · '),
+                      style: WipasText.body,
+                    ),
                 ]),
               ),
         ]),

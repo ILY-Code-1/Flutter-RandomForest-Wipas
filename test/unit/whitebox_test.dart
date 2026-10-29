@@ -117,7 +117,7 @@ void main() {
   });
 
   group('CsvExport._cell (via build)', () {
-    String row(Prediction p) => CsvExport.build([p], const {}).substring(1).trim().split('\r\n')[1];
+    String row(Prediction p) => CsvExport.build([p]).substring(1).trim().split('\r\n')[1];
     test('WB-CS-P1 null value → empty cell', () {
       expect(row(_p()).split(',')[3], '');
     });
@@ -125,19 +125,16 @@ void main() {
       expect(row(_p(actual: 17560)).split(',')[3], '17560');
     });
     test('WB-CS-P3 value with comma/quote → quoted and escaped', () {
-      final decisions = {
-        'pred_WH-CKG-01_20261008': DecisionLog(
-          id: 'd',
-          predId: 'pred_WH-CKG-01_20261008',
-          whId: 'WH-CKG-01',
-          decidedBy: 'u',
-          decidedByName: 'Budi',
-          decision: 'adjusted',
-          manpowerFinal: null,
-          reason: 'rute "padat", hujan',
-        ),
-      };
-      final line = CsvExport.build([_p()], decisions);
+      final p = Prediction(
+        id: 'pred_WH-CKG-01_20261008',
+        whId: 'WH-CKG-01',
+        targetDate: DateTime.utc(2026, 10, 8),
+        predicted: 17200,
+        projection: 16200,
+        decisionStatus: 'adjusted',
+        decisionNote: 'rute "padat", hujan',
+      );
+      final line = CsvExport.build([p]);
       expect(line, contains('"rute ""padat"", hujan"'));
     });
   });

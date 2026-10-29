@@ -131,7 +131,7 @@ alt pilih Setujui (online)
   User -> ManpowerScreen : Setujui
   ManpowerScreen -> WipasRepository : addDecision(approved, manpowerFinal)
   activate WipasRepository
-  WipasRepository -> decision_logs : add({decision: approved, decided_by})
+  WipasRepository -> decision_logs : batch: add({decision_status: approved}) + predictions.decision_*
   activate decision_logs
   decision_logs --> WipasRepository : tersimpan
   deactivate decision_logs
@@ -155,7 +155,7 @@ activate AdjustSheet
 alt alasan diisi
   AdjustSheet -> WipasRepository : addDecision(adjusted, manpowerFinal, reason)
   activate WipasRepository
-  WipasRepository -> decision_logs : add({decision: adjusted, reason})
+  WipasRepository -> decision_logs : batch: add({decision_status: adjusted, note}) + predictions.decision_*
   activate decision_logs
   decision_logs --> WipasRepository : tersimpan
   deactivate decision_logs
@@ -228,7 +228,7 @@ activate ConfigValidator
 ConfigValidator --> KonfigurasiScreen : ConfigValidation
 deactivate ConfigValidator
 alt valid dan dikonfirmasi
-  KonfigurasiScreen -> operational_configs : transaksi update + config_history
+  KonfigurasiScreen -> operational_configs : transaksi update + /history
   activate operational_configs
   operational_configs --> KonfigurasiScreen : tersimpan
   deactivate operational_configs
@@ -302,7 +302,7 @@ WipasRepository --> NotifikasiScreen : daftar + status baca
 NotifikasiScreen --> Pengguna : daftar sesuai filter
 Pengguna -> NotifikasiScreen : Tandai semua dibaca / ketuk notifikasi
 NotifikasiScreen -> WipasRepository : markRead(uid, ids)
-WipasRepository --> NotifikasiScreen : notification_reads tersimpan
+WipasRepository --> NotifikasiScreen : read_by (arrayUnion) tersimpan
 deactivate WipasRepository
 deactivate NotifikasiScreen
 @enduml

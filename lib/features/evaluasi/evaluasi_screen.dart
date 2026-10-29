@@ -547,8 +547,9 @@ class _BatchCard extends StatelessWidget {
               child: WipasInlineStatus(
                 b.isSuccess ? StatusKind.berhasil : StatusKind.gagal,
                 label: switch (b.status) {
-                  'success' => 'Berhasil',
-                  'failed' => 'Gagal',
+                  BatchLog.success => 'Berhasil',
+                  BatchLog.skipped => 'Dilewati (prediksi sudah ada)',
+                  BatchLog.failed => 'Gagal',
                   _ => b.status,
                 },
               ),
@@ -559,6 +560,8 @@ class _BatchCard extends StatelessWidget {
           WipasDataRow(label: 'Sumber data', value: b.source ?? '—', divider: false),
           if (b.message != null && b.message!.isNotEmpty)
             Text(b.message!, style: WipasText.bodySmall.copyWith(color: WipasColors.textSecondary)),
+          if (b.error != null && b.error!.isNotEmpty)
+            Text(b.error!, style: WipasText.bodySmall.copyWith(color: WipasColors.dangerText)),
         ],
       ]),
     );
@@ -586,7 +589,14 @@ class _DatasetCard extends StatelessWidget {
                 ? '—'
                 : '${Fmt.dayMonthYear(d.rangeStart!)} – ${Fmt.dayMonthYear(d.rangeEnd!)}',
           ),
-          WipasDataRow(label: 'Jumlah baris', value: Fmt.number(d.rowCount), divider: d.sourceFile != null),
+          WipasDataRow(label: 'Jumlah baris', value: Fmt.number(d.rowCount)),
+          if (d.labeledCount != null) WipasDataRow(label: 'Baris dengan actual', value: Fmt.number(d.labeledCount)),
+          if (d.lastActualDate != null)
+            WipasDataRow(
+              label: 'Actual terakhir',
+              value: Fmt.dayMonthYear(d.lastActualDate!),
+              divider: d.sourceFile != null,
+            ),
           if (d.sourceFile != null) WipasDataRow(label: 'Berkas sumber', value: d.sourceFile!, divider: false),
         ],
       ]),

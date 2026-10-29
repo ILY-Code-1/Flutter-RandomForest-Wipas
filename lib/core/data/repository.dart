@@ -16,8 +16,9 @@ class Col {
   static const datasetStatus = 'dataset_status';
   static const notifications = 'notifications';
   static const users = 'users';
-  static const notificationReads = 'notification_reads';
-  static const configHistory = 'config_history';
+
+  /// Sub-collection `operational_configs/{wh}/history`.
+  static const configHistory = 'history';
   static const decisionLogs = 'decision_logs';
   static const warehouses = 'warehouses';
 }
@@ -90,18 +91,25 @@ class WipasRepository {
       .snapshots(includeMetadataChanges: _meta)
       .map((s) => Snap(ModelHealth.fromMap(s.data()), fromCache: s.metadata.isFromCache));
 
-  /// Rolling-MAE history (oldest → newest) for the last [days] days up to [end].
+  /// Rolling-MAE history (returned oldest → newest) for the last [days]
+  /// days up to [end]. Queried `date` DESC to use the contract index
+  /// (wh_id ASC, date DESC).
   Stream<Snap<List<ModelHealthPoint>>> watchModelHealthHistory(DateTime end, {int days = 30}) {
     final start = end.subtract(Duration(days: days - 1));
     return _c(Col.modelHealthHistory)
         .where('wh_id', isEqualTo: whId)
         .where('date', isGreaterThanOrEqualTo: Fmt.isoDate(start))
         .where('date', isLessThanOrEqualTo: Fmt.isoDate(end))
-        .orderBy('date')
+        .orderBy('date', descending: true)
         .limit(days)
         .snapshots(includeMetadataChanges: _meta)
         .map((s) => Snap(
-              s.docs.map((d) => ModelHealthPoint.fromMap(d.data())).whereType<ModelHealthPoint>().toList(),
+              s.docs
+                  .map((d) => ModelHealthPoint.fromMap(d.data()))
+                  .whereType<ModelHealthPoint>()
+                  .toList()
+                  .reversed
+                  .toList(),
               fromCache: s.metadata.isFromCache,
             ));
   }
@@ -121,7 +129,7 @@ class WipasRepository {
 
   /// Decisions for one prediction, newest first.
   Stream<Snap<List<DecisionLog>>> watchDecisionsFor(String predId) => _c(Col.decisionLogs)
-      .where('pred_id', isEqualTo: predId)
+      .where('prediction_id', isEqualTo: predId)
       .orderBy('decided_at', descending: true)
       .limit(20)
       .snapshots(includeMetadataChanges: _meta)
@@ -141,8 +149,9 @@ class WipasRepository {
             fromCache: s.metadata.isFromCache,
           ));
 
-  Stream<Snap<List<ConfigHistoryEntry>>> watchConfigHistory({int limit = 10}) => _c(Col.configHistory)
-      .where('wh_id', isEqualTo: whId)
+  Stream<Snap<List<ConfigHistoryEntry>>> watchConfigHistory({int limit = 10}) => _c(Col.operationalConfigs)
+      .doc(whId)
+      .collection(Col.configHistory)
       .orderBy('changed_at', descending: true)
       .limit(limit)
       .snapshots(includeMetadataChanges: _meta)
@@ -165,14 +174,6 @@ class WipasRepository {
                 .toList(),
             fromCache: s.metadata.isFromCache,
           ));
-
-  /// IDs of notifications already read by [uid].
-  Stream<Set<String>> watchReadIds(String uid) => _c(Col.users)
-      .doc(uid)
-      .collection(Col.notificationReads)
-      .limit(200)
-      .snapshots()
-      .map((s) => s.docs.map((d) => d.id).toSet());
 
   Stream<Warehouse> watchWarehouse() =>
       _c(Col.warehouses).doc(whId).snapshots().map((s) => Warehouse.fromMap(whId, s.data()));
@@ -200,41 +201,55 @@ class WipasRepository {
     });
   }
 
-  /// Appends a manpower decision (append-only log).
+  /// Records a manpower decision atomically: appends `decision_logs` and
+  /// sets the App-owned `decision_*` fields on the prediction.
   Future<void> addDecision({
-    required String predId,
+    required Prediction prediction,
     required String uid,
     required String name,
     required String decision,
     required ManpowerCounts manpowerFinal,
     String? reason,
   }) {
-    return _c(Col.decisionLogs).add({
-      'pred_id': predId,
+    final note = (reason == null || reason.trim().isEmpty) ? null : reason.trim();
+    final batch = db.batch();
+    batch.set(_c(Col.decisionLogs).doc(), {
       'wh_id': whId,
+      'target_date': Fmt.isoDate(prediction.targetDate),
+      'prediction_id': prediction.id,
+      'recommended': prediction.manpower?.counts.toMap(),
+      'final': manpowerFinal.toMap(),
+      'decision_status': decision,
+      'note': note,
       'decided_by': uid,
       'decided_by_name': name,
-      'decision': decision,
-      'manpower_final': manpowerFinal.toMap(),
-      'reason': reason,
       'decided_at': FieldValue.serverTimestamp(),
     });
+    batch.update(_c(Col.predictions).doc(prediction.id), {
+      'decision_status': decision,
+      'decision_by': uid,
+      'decision_at': FieldValue.serverTimestamp(),
+      'decision_note': note,
+      'decision_manpower': manpowerFinal.toMap(),
+    });
+    return batch.commit();
   }
 
-  /// Updates the capacity config and appends `config_history` atomically.
+  /// Updates the capacity config and appends a copy to
+  /// `operational_configs/{wh}/history` in one transaction. [note] is the
+  /// human-readable change summary shown in "Riwayat perubahan".
   Future<void> saveConfig({
     required CapacityConfig newValues,
     required String uid,
     required String name,
+    required String note,
   }) {
     final cfgRef = _c(Col.operationalConfigs).doc(whId);
-    final histRef = _c(Col.configHistory).doc();
+    final histRef = cfgRef.collection(Col.configHistory).doc();
     return db.runTransaction((tx) async {
       final current = await tx.get(cfgRef);
-      final old = current.data() == null
-          ? CapacityConfig.defaults
-          : OperationalConfig.fromMap(current.data()!).capacity;
       final data = {
+        'wh_id': whId,
         ...newValues.toMap(),
         'rounding': 'ceil',
         'updated_by': uid,
@@ -246,22 +261,22 @@ class WipasRepository {
         tx.set(cfgRef, data);
       }
       tx.set(histRef, {
-        'wh_id': whId,
+        ...data,
         'changed_by': uid,
         'changed_by_name': name,
         'changed_at': FieldValue.serverTimestamp(),
-        'old_values': old.toMap(),
-        'new_values': newValues.toMap(),
+        'note': note,
       });
     });
   }
 
-  /// Marks notifications as read for [uid].
+  /// Marks notifications as read for [uid] (`read_by` arrayUnion).
   Future<void> markRead(String uid, Iterable<String> notifIds) async {
     final batch = db.batch();
-    final reads = _c(Col.users).doc(uid).collection(Col.notificationReads);
     for (final id in notifIds) {
-      batch.set(reads.doc(id), {'read_at': FieldValue.serverTimestamp()});
+      batch.update(_c(Col.notifications).doc(id), {
+        'read_by': FieldValue.arrayUnion([uid]),
+      });
     }
     await batch.commit();
   }

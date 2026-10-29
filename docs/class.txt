@@ -7,16 +7,14 @@ hide circle
 class Warehouse {
   - id : String
   - name : String
-  - city : String
+  - code : String
+  - timezone : String
 }
 
 class AppUser {
   - uid : String
-  - displayName : String
-  - email : String
+  - name : String
   - role : Role
-  - whId : String
-  - jobTitle : String
   + initials() : String
 }
 
@@ -35,16 +33,24 @@ class Prediction {
   - inputFeatures : Map<String, Object>
   - featureImportance : Map<String, double>
   - isBackfill : bool
+  - isDummyData : bool
+  - notes : List<String>
   - actualInbound : int
   - actualNote : String
   - actualInputBy : String
   - actualInputAt : DateTime
   - dailyErrorPct : double
   - evaluated : bool
+  - decisionStatus : String
+  - decisionBy : String
+  - decisionAt : DateTime
+  - decisionNote : String
+  - decisionManpower : Map<String, int>
   + deviation() : double
   + needsAttention() : bool
   + errorPct() : double
   + isFallback() : bool
+  + isDecided() : bool
 }
 
 class ManpowerRecommendation {
@@ -53,6 +59,7 @@ class ManpowerRecommendation {
   - opInbound : int
   - opOutbound : int
   - configSnapshot : OperationalConfig
+  - snapshotSource : String
   + total() : int
 }
 
@@ -73,13 +80,15 @@ class OperationalConfig {
 
 class DecisionLog {
   - id : String
-  - predId : String
+  - predictionId : String
   - whId : String
+  - targetDate : Date
   - decidedBy : String
   - decidedByName : String
-  - decision : String
-  - manpowerFinal : Map<String, int>
-  - reason : String
+  - decisionStatus : String
+  - recommended : Map<String, int>
+  - final : Map<String, int>
+  - note : String
   - decidedAt : DateTime
   + isAdjusted() : bool
 }
@@ -88,8 +97,10 @@ class ModelHealth {
   - whId : String
   - status : String
   - rollingMae7d : double
+  - nPoints : int
   - baselineMae : double
   - driftThreshold : double
+  - driftFactor : double
   - modelVersion : String
   - maeValidation : double
   - rmse : double
@@ -104,14 +115,16 @@ class AppNotification {
   - type : String
   - title : String
   - body : String
+  - severity : String
   - whId : String
   - targetDate : Date
   - createdAt : DateTime
   - audienceRoles : List<Role>
+  - readBy : List<String>
   + untukRole(role : Role) : bool
+  + sudahDibaca(uid : String) : bool
 }
 
-Warehouse "1" o-- "0..*" AppUser : menaungi >
 Warehouse "1" -- "0..*" Prediction : memiliki >
 Warehouse "1" -- "1" OperationalConfig : diatur oleh >
 Warehouse "1" -- "1" ModelHealth : dipantau oleh >

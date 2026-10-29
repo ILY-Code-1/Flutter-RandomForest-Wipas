@@ -1,8 +1,10 @@
 rules_version = '2';
 
-// WIPAS security rules. Deny by default; the role comes from users/{uid}.role.
-// The batch script (wipas-research) writes with the Admin SDK, which bypasses
-// these rules, so every server-owned collection is read-only for clients.
+// WIPAS security rules — contract docs/firestore_schema.md v1.0.
+// Deny by default; the role comes from users/{uid}.role
+// (admin | manager | supervisor | viewer). The batch script (wipas-research)
+// writes with the Admin SDK, which bypasses these rules, so clients may only
+// touch the App-owned fields listed in the contract.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -34,67 +36,96 @@ service cloud.firestore {
         && math.abs(d.ratio_rider + d.ratio_driver - 1.0) <= 0.001;
     }
 
+    function validManpower(m) {
+      return m is map
+        && m.keys().hasOnly(['rider', 'driver', 'op_inbound', 'op_outbound'])
+        && m.rider is int && m.rider >= 0
+        && m.driver is int && m.driver >= 0
+        && m.op_inbound is int && m.op_inbound >= 0
+        && m.op_outbound is int && m.op_outbound >= 0;
+    }
+
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
     // ---------------------------------------------------------------- users
     match /users/{uid} {
       // Own profile only; accounts and roles are managed in the Firebase Console.
       allow read: if signedIn() && request.auth.uid == uid;
       allow write: if false;
-
-      match /notification_reads/{notifId} {
-        allow read, write: if signedIn() && request.auth.uid == uid;
-      }
     }
 
     // ---------------------------------------------------------- predictions
     match /predictions/{predId} {
       allow read: if signedIn();
       allow create, delete: if false;
-      // Admin and Supervisor may only fill in the actual_* fields.
+
+      // App-owned actual_* fields: Admin and Supervisor.
       allow update: if hasRole(['admin', 'supervisor'])
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['actual_inbound', 'actual_note', 'actual_input_by', 'actual_input_at'])
+        && changed().hasOnly(['actual_inbound', 'actual_note', 'actual_input_by', 'actual_input_at'])
         && request.resource.data.actual_inbound is int
         && request.resource.data.actual_inbound >= 0
         && request.resource.data.actual_input_by == request.auth.uid
         && (request.resource.data.actual_note == null
             || (request.resource.data.actual_note is string && request.resource.data.actual_note.size() <= 500));
+
+      // App-owned decision_* fields: Admin and Manager.
+      allow update: if hasRole(['admin', 'manager'])
+        && changed().hasOnly(['decision_status', 'decision_by', 'decision_at', 'decision_note', 'decision_manpower'])
+        && request.resource.data.decision_status in ['approved', 'adjusted']
+        && request.resource.data.decision_by == request.auth.uid
+        && validManpower(request.resource.data.decision_manpower)
+        && (request.resource.data.decision_status == 'approved'
+            || (request.resource.data.decision_note is string && request.resource.data.decision_note.size() > 0));
     }
 
     // -------------------------------------------------- operational_configs
     match /operational_configs/{whId} {
       allow read: if signedIn();
-      allow create, update: if hasRole(['admin', 'manajer'])
+      allow create, update: if hasRole(['admin', 'manager'])
         && validCapacity(request.resource.data)
+        && request.resource.data.wh_id == whId
         && request.resource.data.updated_by == request.auth.uid
         && request.resource.data.keys().hasOnly([
-             'capacity_rider', 'capacity_driver', 'capacity_op_inbound', 'capacity_op_outbound',
+             'wh_id', 'capacity_rider', 'capacity_driver', 'capacity_op_inbound', 'capacity_op_outbound',
              'ratio_rider', 'ratio_driver', 'rounding', 'updated_by', 'updated_at']);
       allow delete: if false;
+
+      // App-owned, append-only change history.
+      match /history/{id} {
+        allow read: if hasRole(['admin', 'manager', 'supervisor']);
+        allow create: if hasRole(['admin', 'manager'])
+          && request.resource.data.changed_by == request.auth.uid
+          && validCapacity(request.resource.data);
+        allow update, delete: if false;
+      }
     }
 
-    // ------------------------------------------------ append-only audit logs
-    match /config_history/{id} {
-      allow read: if hasRole(['admin', 'manajer', 'supervisor']);
-      allow create: if hasRole(['admin', 'manajer'])
-        && request.resource.data.changed_by == request.auth.uid;
-      allow update, delete: if false;
-    }
-
+    // ------------------------------------------------------- decision_logs
     match /decision_logs/{id} {
-      allow read: if hasRole(['admin', 'manajer', 'supervisor']);
-      allow create: if hasRole(['admin', 'manajer'])
+      allow read: if hasRole(['admin', 'manager', 'supervisor']);
+      allow create: if hasRole(['admin', 'manager'])
         && request.resource.data.decided_by == request.auth.uid
-        && request.resource.data.decision in ['approved', 'adjusted']
-        && (request.resource.data.decision == 'approved'
-            || (request.resource.data.reason is string && request.resource.data.reason.size() > 0));
+        && request.resource.data.decision_status in ['approved', 'adjusted']
+        && request.resource.data.prediction_id is string
+        && validManpower(request.resource.data.final)
+        && (request.resource.data.decision_status == 'approved'
+            || (request.resource.data.note is string && request.resource.data.note.size() > 0));
       allow update, delete: if false;
     }
 
     // -------------------------------------------------------- notifications
     match /notifications/{id} {
-      allow read: if hasRole(['admin', 'manajer', 'supervisor', 'viewer'])
+      allow read: if hasRole(['admin', 'manager', 'supervisor', 'viewer'])
         && role() in resource.data.audience_roles;
-      allow write: if false;
+      // App-owned read_by: a recipient may only add their own uid.
+      allow update: if hasRole(['admin', 'manager', 'supervisor', 'viewer'])
+        && role() in resource.data.audience_roles
+        && changed().hasOnly(['read_by'])
+        && request.resource.data.read_by.toSet()
+             == resource.data.get('read_by', []).toSet().union([request.auth.uid].toSet());
+      allow create, delete: if false;
     }
 
     // ------------------------------------------- script-owned, read-only data

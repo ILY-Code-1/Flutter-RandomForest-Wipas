@@ -45,14 +45,15 @@ class CsvExport {
     return '${Fmt.isoDate(w)} ${two(w.hour)}:${two(w.minute)}';
   }
 
-  /// [rows] newest first or any order; output is sorted by date ascending.
-  /// [decisions] maps pred_id → latest decision (omit for no decision columns).
-  static String build(List<Prediction> rows, Map<String, DecisionLog> decisions) {
+  /// [rows] in any order; output is sorted by date ascending. Decision
+  /// columns come from the prediction's `decision_*` fields; [deciderNames]
+  /// (prediction_id → name from decision_logs) fills `diputuskan_oleh`,
+  /// falling back to the `decision_by` uid.
+  static String build(List<Prediction> rows, [Map<String, String> deciderNames = const {}]) {
     final sorted = [...rows]..sort((a, b) => a.targetDate.compareTo(b.targetDate));
     final lines = <String>[header.map(_cell).join(',')];
     for (final p in sorted) {
-      final d = decisions[p.id];
-      final m = d?.manpowerFinal;
+      final m = p.decisionManpower;
       lines.add([
         Fmt.isoDate(p.targetDate),
         p.projection,
@@ -61,14 +62,14 @@ class CsvExport {
         p.deviation?.toStringAsFixed(1),
         p.needsAttention ? 'ya' : 'tidak',
         p.dataStatus,
-        d == null ? 'menunggu' : (d.isAdjusted ? 'disesuaikan' : 'disetujui'),
+        !p.isDecided ? 'menunggu' : (p.isAdjusted ? 'disesuaikan' : 'disetujui'),
         m?.rider,
         m?.driver,
         m?.opInbound,
         m?.opOutbound,
-        d?.reason,
-        d?.decidedByName,
-        d?.decidedAt == null ? null : _wib(d!.decidedAt!),
+        p.decisionNote,
+        deciderNames[p.id] ?? p.decisionBy,
+        p.decisionAt == null ? null : _wib(p.decisionAt!),
       ].map(_cell).join(','));
     }
     return '$bom${lines.join('\r\n')}\r\n';

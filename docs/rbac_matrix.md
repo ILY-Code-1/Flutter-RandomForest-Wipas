@@ -36,7 +36,9 @@ Bottom nav: Admin & Manajer 5 tab; Supervisor tanpa Evaluasi; Viewer tanpa Manpo
 `firebase/firestore.rules` menegakkan hal yang sama di server — lihat ringkasan di `docs/architecture.md` dan test di `firebase/rules-tests/rules.test.mjs`:
 - `predictions`: baca semua user login; update hanya Admin/Supervisor dan hanya `actual_*` (int ≥ 0, `actual_input_by` = uid sendiri).
 - `operational_configs`: update Admin/Manajer dengan validasi kapasitas > 0 dan rasio = 1,00.
-- `decision_logs`, `config_history`: create Admin/Manajer (atas nama sendiri), baca Admin/Manajer/Supervisor, tanpa update/delete.
-- `notifications`: baca bila role ada di `audience_roles`; tanpa tulis.
-- `users/{uid}`: baca dokumen sendiri; `notification_reads` baca/tulis pemilik.
+- `predictions` (`decision_*`): update Admin/Manajer, hanya field `decision_*`, `decision_by` = uid sendiri, catatan wajib bila `adjusted`.
+- `decision_logs`, `operational_configs/{wh}/history`: create Admin/Manajer (atas nama sendiri), baca Admin/Manajer/Supervisor, tanpa update/delete.
+- `notifications`: baca bila role ada di `audience_roles`; tanpa create/delete; update hanya `read_by`.
+- `users/{uid}`: baca dokumen sendiri. `notifications.read_by`: penerima (role ∈ `audience_roles`) hanya boleh menambahkan uid sendiri.
+- Nilai role di Firestore: `admin`, `manager`, `supervisor`, `viewer` (enum Dart `Role.manajer` ↔ `manager`).
 - Koleksi milik script: baca saja.

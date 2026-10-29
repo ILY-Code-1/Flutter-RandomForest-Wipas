@@ -78,7 +78,7 @@ void main() {
         'predicted': '18420',
         'projection': 15900.0,
         'manpower': 'oops',
-        'input_features': {'is_campaign': 1, 'backlog_h1': 'n/a'},
+        'input_features': {'campaign': 1, 'backlog_h1': 'n/a'},
         'generated_at': Timestamp.fromDate(DateTime.utc(2026, 10, 8, 16)),
         'data_status': 'incomplete_fallback_h2',
       })!;
@@ -115,22 +115,108 @@ void main() {
     test('AppUser needs a valid role', () {
       expect(AppUser.fromDoc('u', {'role': 'superuser'}), isNull);
       expect(AppUser.fromDoc('u', null), isNull);
-      final u = AppUser.fromDoc('u', {'role': 'viewer', 'display_name': 'Dewi Lestari'}, fallbackEmail: 'd@x')!;
+      final u = AppUser.fromDoc('u', {'role': 'viewer', 'name': 'Dewi Lestari'}, fallbackEmail: 'd@x')!;
       expect(u.role, Role.viewer);
       expect(u.initials, 'DL');
       expect(u.email, 'd@x');
       expect(u.whId, 'WH-CKG-01');
-      expect(AppUser.fromDoc('a', {'role': 'admin', 'display_name': 'Admin WIPAS · Shift Lead'})!.initials, 'AW');
+      expect(AppUser.fromDoc('a', {'role': 'admin', 'name': 'Admin WIPAS · Shift Lead'})!.initials, 'AW');
+      // Contract role value is "manager" (not "manajer").
+      final m = AppUser.fromDoc('m', {'role': 'manager', 'name': 'Budi Santoso'})!;
+      expect(m.role, Role.manajer);
+      expect(m.roleChipLabel, 'Manajer Warehouse');
+      expect(AppUser.fromDoc('m', {'role': 'manajer'}), isNull);
+    });
+
+    test('Prediction reads the contract input_features keys and decision_* fields', () {
+      final p = Prediction.fromDoc('pred_WH-CKG-01_20261001', {
+        'target_date': '2026-10-01',
+        'predicted': 17219,
+        'projection': null,
+        'deviation_pct': null,
+        'status': 'Normal',
+        'input_features': {
+          'hari': 3,
+          'bulan': 10,
+          'campaign': 0,
+          'hari_libur': 0,
+          'payday': 1,
+          'pickup_request_h1': 13629,
+          'projection_inbound': 18812,
+          'backlog_h1': 1864,
+          'actual_h2': 17325,
+          'actual_h1': 16111,
+        },
+        'manpower': {
+          'rider': 35,
+          'driver': 7,
+          'op_inbound': 35,
+          'op_outbound': 29,
+          'config_snapshot': {'capacity_rider': 350, 'ratio_rider': 0.7, 'rounding': 'ceil', 'source': 'default'},
+        },
+        'is_dummy_data': true,
+        'notes': ['Fallback H-2', 7],
+        'decision_status': 'adjusted',
+        'decision_note': 'antrean',
+        'decision_manpower': {'rider': 37, 'driver': 7, 'op_inbound': 35, 'op_outbound': 29},
+      })!;
+      final f = p.inputFeatures;
+      expect([f.hari, f.bulan, f.isCampaign, f.isHoliday, f.isPayday], [3, 10, false, false, true]);
+      expect([f.pickupRequestH1, f.projectionInbound, f.backlogH1, f.actualInboundH2, f.actualInboundH1],
+          [13629, 18812, 1864, 17325, 16111]);
+      expect(p.projection, isNull);
+      expect(p.deviation, isNull);
+      expect(p.needsAttention, isFalse);
+      expect(p.manpower!.counts.total, 106);
+      expect(p.manpower!.snapshotSource, 'default');
+      expect(p.isDummyData, isTrue);
+      expect(p.notes, ['Fallback H-2']);
+      expect(p.isDecided, isTrue);
+      expect(p.isAdjusted, isTrue);
+      expect(p.decisionManpower!.rider, 37);
+      expect(featureLabels.keys.toSet(), {
+        'hari', 'bulan', 'campaign', 'hari_libur', 'payday',
+        'pickup_request_h1', 'projection_inbound', 'backlog_h1', 'actual_h2', 'actual_h1',
+      });
+    });
+
+    test('Notification read state comes from read_by', () {
+      final n = AppNotification.fromDoc('n', {'type': 'batch', 'severity': 'info', 'read_by': ['u1']})!;
+      expect(n.isReadBy('u1'), isTrue);
+      expect(n.isReadBy('u2'), isFalse);
+      expect(n.severity, 'info');
+    });
+
+    test('BatchLog reads duration_s, retries and skipped status', () {
+      final b = BatchLog.fromMap({'status': 'skipped', 'duration_s': 133.6, 'retries': 2, 'error': null})!;
+      expect(b.durationSec, 134);
+      expect(b.retryCount, 2);
+      expect(b.isSuccess, isTrue);
+      expect(BatchLog.fromMap({'status': 'failed'})!.isSuccess, isFalse);
     });
 
     test('Other converters', () {
-      expect(DecisionLog.fromDoc('d', {'pred_id': 'p'}), isNull);
-      expect(DecisionLog.fromDoc('d', {'decision': 'adjusted'})!.isAdjusted, isTrue);
+      expect(DecisionLog.fromDoc('d', {'prediction_id': 'p'}), isNull);
+      final log = DecisionLog.fromDoc('d', {
+        'prediction_id': 'p',
+        'decision_status': 'adjusted',
+        'final': {'rider': 40, 'driver': 7, 'op_inbound': 37, 'op_outbound': 31},
+        'note': 'antrean',
+      })!;
+      expect(log.isAdjusted, isTrue);
+      expect(log.predId, 'p');
+      expect(log.manpowerFinal!.rider, 40);
+      expect(log.reason, 'antrean');
       expect(BatchLog.fromMap({})!.status, 'unknown');
       expect(DatasetStatus.fromMap({'row_count': 646})!.rowCount, 646);
       expect(AppNotification.fromDoc('n', {'audience_roles': 'admin'})!.audienceRoles, isEmpty);
       expect(ModelHealthPoint.fromMap({'date': '2026-10-08'}), isNull);
-      expect(ConfigHistoryEntry.fromDoc('h', {}).newValues, isEmpty);
+      expect(ConfigHistoryEntry.fromDoc('h', {}).values, isEmpty);
+      final h = ConfigHistoryEntry.fromDoc('h', {'capacity_rider': 400, 'changed_by': 'u', 'note': 'Capacity_Rider: 350 → 400'});
+      expect(h.values['capacity_rider'], 400);
+      expect(h.changedByName, 'u');
+      expect(h.note, 'Capacity_Rider: 350 → 400');
+      expect(ModelHealth.fromMap({'baseline_mae': 8.0, 'drift_factor': 1.2})!.threshold, closeTo(9.6, 1e-9));
     });
   });
 
@@ -150,31 +236,27 @@ void main() {
         predicted: 17200,
         projection: 16200,
         actualInbound: 17560,
+        decisionStatus: 'adjusted',
+        decisionBy: 'uid-manajer',
+        decisionManpower: const ManpowerCounts(rider: 40, driver: 7, opInbound: 37, opOutbound: 31),
+        decisionNote: 'antrean, "padat"',
+        decisionAt: DateTime.utc(2026, 10, 7, 23, 40),
       ),
     ];
-    final decisions = {
-      'pred_WH-CKG-01_20261008': DecisionLog(
-        id: 'd',
-        predId: 'pred_WH-CKG-01_20261008',
-        whId: 'WH-CKG-01',
-        decidedBy: 'u',
-        decidedByName: 'Budi Santoso',
-        decision: 'adjusted',
-        manpowerFinal: const ManpowerCounts(rider: 40, driver: 7, opInbound: 37, opOutbound: 31),
-        reason: 'antrean, "padat"',
-        decidedAt: DateTime.utc(2026, 10, 7, 23, 40),
-      ),
-    };
+    const names = {'pred_WH-CKG-01_20261008': 'Budi Santoso'};
 
     test('starts with UTF-8 BOM, comma separated, sorted ascending', () {
-      final csv = CsvExport.build(rows, decisions);
+      final csv = CsvExport.build(rows, names);
       expect(csv.startsWith('﻿'), isTrue);
       final lines = csv.substring(1).trim().split('\r\n');
       expect(lines.first, CsvExport.header.join(','));
       expect(lines, hasLength(3));
       expect(lines[1].startsWith('2026-10-08,16200,17200,17560,6.2,tidak,complete,disesuaikan,40,7,37,31,'), isTrue);
       expect(lines[1], contains('"antrean, ""padat"""'));
+      expect(lines[1], contains(',Budi Santoso,'));
       expect(lines[1].endsWith('2026-10-08 06:40'), isTrue);
+      // Without a name from decision_logs the decision_by uid is used.
+      expect(CsvExport.build(rows), contains(',uid-manajer,'));
       expect(lines[2].startsWith('2026-10-09,15900,18420,,15.8,ya,complete,menunggu'), isTrue);
     });
 

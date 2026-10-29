@@ -8,66 +8,80 @@ entity Warehouse {
   * wh_id : VARCHAR <<PK>>
   --
   * name : VARCHAR
-  city : VARCHAR
+  * timezone : VARCHAR
+  * created_at : TIMESTAMP
 }
 entity AppUser {
   * uid : VARCHAR <<PK>>
   --
-  * wh_id : VARCHAR <<FK>>
-  * display_name : VARCHAR
-  * email : VARCHAR
+  * name : VARCHAR
   * role : VARCHAR
-  job_title : VARCHAR
 }
 entity DailyData {
   * daily_id : VARCHAR <<PK>>
   --
   * wh_id : VARCHAR <<FK>>
   * date : DATE
-  * day_of_week : SMALLINT
-  * month : SMALLINT
-  * is_campaign : BOOLEAN
-  * is_holiday : BOOLEAN
-  * is_payday : BOOLEAN
-  pickup_request_h1 : INTEGER
+  campaign : SMALLINT
+  * hari_libur : SMALLINT
+  * payday : SMALLINT
+  * pickup_request_h1 : INTEGER
   * projection_inbound : INTEGER
-  backlog_h1 : INTEGER
-  actual_inbound_h2 : INTEGER
-  actual_inbound_h1 : INTEGER
+  * backlog_h1 : INTEGER
   actual_inbound : INTEGER
+  actual_source : VARCHAR
+  actual_synced_at : TIMESTAMP
+  row_hash : CHAR
   source_file : VARCHAR
+  imported_at : TIMESTAMP
 }
 entity Prediction {
   * pred_id : VARCHAR <<PK>>
   --
   * wh_id : VARCHAR <<FK>>
   actual_input_by : VARCHAR <<FK>>
+  decision_by : VARCHAR <<FK>>
   * target_date : DATE
   * predicted : INTEGER
-  * projection : INTEGER
-  * deviation_pct : DECIMAL
+  projection : INTEGER
+  deviation_pct : DECIMAL
   * alert : BOOLEAN
   * status : VARCHAR
   * data_status : VARCHAR
   * source : VARCHAR
   * model_version : VARCHAR
   * generated_at : TIMESTAMP
-  * feat_day_of_week : SMALLINT
-  * feat_month : SMALLINT
-  * feat_is_campaign : BOOLEAN
-  * feat_is_holiday : BOOLEAN
-  * feat_is_payday : BOOLEAN
+  * feat_hari : SMALLINT
+  * feat_bulan : SMALLINT
+  feat_campaign : SMALLINT
+  * feat_hari_libur : SMALLINT
+  * feat_payday : SMALLINT
   feat_pickup_request_h1 : INTEGER
   * feat_projection_inbound : INTEGER
   feat_backlog_h1 : INTEGER
-  feat_actual_inbound_h2 : INTEGER
-  feat_actual_inbound_h1 : INTEGER
+  feat_actual_h2 : INTEGER
+  feat_actual_h1 : INTEGER
   * is_backfill : BOOLEAN
+  * is_dummy_data : BOOLEAN
+  * evaluated : BOOLEAN
+  daily_error_pct : DECIMAL
+  evaluated_at : TIMESTAMP
   actual_inbound : INTEGER
   actual_note : VARCHAR
   actual_input_at : TIMESTAMP
-  daily_error_pct : DECIMAL
-  * evaluated : BOOLEAN
+  decision_status : VARCHAR
+  decision_at : TIMESTAMP
+  decision_note : VARCHAR
+  decision_rider : INTEGER
+  decision_driver : INTEGER
+  decision_op_inbound : INTEGER
+  decision_op_outbound : INTEGER
+}
+entity PredictionNote {
+  * pred_id : VARCHAR <<PK>> <<FK>>
+  * seq : SMALLINT <<PK>>
+  --
+  * note : VARCHAR
 }
 entity ManpowerRecommendation {
   * pred_id : VARCHAR <<PK>> <<FK>>
@@ -82,6 +96,8 @@ entity ManpowerRecommendation {
   * snap_capacity_op_outbound : DECIMAL
   * snap_ratio_rider : DECIMAL
   * snap_ratio_driver : DECIMAL
+  * snap_rounding : VARCHAR
+  * snap_source : VARCHAR
 }
 entity PredictionFeatureImportance {
   * pred_id : VARCHAR <<PK>> <<FK>>
@@ -92,7 +108,6 @@ entity PredictionFeatureImportance {
 entity OperationalConfig {
   * wh_id : VARCHAR <<PK>> <<FK>>
   --
-  * updated_by : VARCHAR <<FK>>
   * capacity_rider : DECIMAL
   * capacity_driver : DECIMAL
   * capacity_op_inbound : DECIMAL
@@ -100,6 +115,7 @@ entity OperationalConfig {
   * ratio_rider : DECIMAL
   * ratio_driver : DECIMAL
   * rounding : VARCHAR
+  * updated_by : VARCHAR
   * updated_at : TIMESTAMP
 }
 entity ConfigHistory {
@@ -109,27 +125,33 @@ entity ConfigHistory {
   * changed_by : VARCHAR <<FK>>
   * changed_by_name : VARCHAR
   * changed_at : TIMESTAMP
-}
-entity ConfigHistoryDetail {
-  * history_id : VARCHAR <<PK>> <<FK>>
-  * field_name : VARCHAR <<PK>>
-  --
-  old_value : DECIMAL
-  * new_value : DECIMAL
+  * note : VARCHAR
+  * capacity_rider : DECIMAL
+  * capacity_driver : DECIMAL
+  * capacity_op_inbound : DECIMAL
+  * capacity_op_outbound : DECIMAL
+  * ratio_rider : DECIMAL
+  * ratio_driver : DECIMAL
+  * rounding : VARCHAR
 }
 entity DecisionLog {
   * decision_id : VARCHAR <<PK>>
   --
-  * pred_id : VARCHAR <<FK>>
+  * prediction_id : VARCHAR <<FK>>
   * wh_id : VARCHAR <<FK>>
   * decided_by : VARCHAR <<FK>>
   * decided_by_name : VARCHAR
-  * decision : VARCHAR
-  * rider_final : INTEGER
-  * driver_final : INTEGER
-  * op_inbound_final : INTEGER
-  * op_outbound_final : INTEGER
-  reason : VARCHAR
+  * target_date : DATE
+  * decision_status : VARCHAR
+  * recommended_rider : INTEGER
+  * recommended_driver : INTEGER
+  * recommended_op_inbound : INTEGER
+  * recommended_op_outbound : INTEGER
+  * final_rider : INTEGER
+  * final_driver : INTEGER
+  * final_op_inbound : INTEGER
+  * final_op_outbound : INTEGER
+  note : VARCHAR
   * decided_at : TIMESTAMP
 }
 entity ModelHealth {
@@ -137,12 +159,20 @@ entity ModelHealth {
   --
   * status : VARCHAR
   * rolling_mae_7d : DECIMAL
+  * rolling_window_days : SMALLINT
+  * n_points : SMALLINT
+  * last_evaluated_date : DATE
   * baseline_mae : DECIMAL
   * drift_threshold : DECIMAL
+  * drift_factor : DECIMAL
   * model_version : VARCHAR
   * mae_validation : DECIMAL
+  * mae_validation_paket : DECIMAL
   * rmse : DECIMAL
+  * rmse_paket : DECIMAL
   * r2 : DECIMAL
+  * trained_at : TIMESTAMP
+  * is_dummy_data : BOOLEAN
   * updated_at : TIMESTAMP
 }
 entity ModelHealthHistory {
@@ -151,23 +181,35 @@ entity ModelHealthHistory {
   * wh_id : VARCHAR <<FK>>
   * date : DATE
   * rolling_mae_7d : DECIMAL
+  * status : VARCHAR
   * baseline_mae : DECIMAL
   * drift_threshold : DECIMAL
-  * status : VARCHAR
+  * n_points : SMALLINT
+  * model_version : VARCHAR
+  * updated_at : TIMESTAMP
 }
 entity BatchLog {
   * batch_id : VARCHAR <<PK>>
   --
   * wh_id : VARCHAR <<FK>>
-  * run_date : DATE
   * target_date : DATE
   * started_at : TIMESTAMP
-  finished_at : TIMESTAMP
-  duration_sec : INTEGER
+  * finished_at : TIMESTAMP
+  * duration_s : DECIMAL
   * status : VARCHAR
-  * retry_count : SMALLINT
-  * source : VARCHAR
-  message : VARCHAR
+  * message : VARCHAR
+  * retries : SMALLINT
+  source : VARCHAR
+  data_status : VARCHAR
+  model_version : VARCHAR
+  predicted : INTEGER
+  error : VARCHAR
+  * dry_run : BOOLEAN
+}
+entity BatchEvaluatedDate {
+  * batch_id : VARCHAR <<PK>> <<FK>>
+  * evaluated_date : DATE <<PK>>
+  --
 }
 entity DatasetStatus {
   * wh_id : VARCHAR <<PK>> <<FK>>
@@ -176,17 +218,31 @@ entity DatasetStatus {
   * range_start : DATE
   * range_end : DATE
   * row_count : INTEGER
-  source_file : VARCHAR
+  * labeled_count : INTEGER
+  last_actual_date : DATE
+  * source_file : VARCHAR
+  * is_dummy_data : BOOLEAN
+  * last_import_written_rows : INTEGER
+  last_batch_at : TIMESTAMP
+  last_batch_status : VARCHAR
+  last_batch_target_date : DATE
 }
 entity Notification {
   * notif_id : VARCHAR <<PK>>
   --
   * wh_id : VARCHAR <<FK>>
+  batch_log_id : VARCHAR <<FK>>
   * type : VARCHAR
   * title : VARCHAR
   * body : VARCHAR
+  * severity : VARCHAR
   * target_date : DATE
   * created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+  batch_status : VARCHAR
+  deviation_pct : DECIMAL
+  rolling_mae_7d : DECIMAL
+  drift_threshold : DECIMAL
 }
 entity NotificationAudience {
   * notif_id : VARCHAR <<PK>> <<FK>>
@@ -197,9 +253,7 @@ entity NotificationRead {
   * uid : VARCHAR <<PK>> <<FK>>
   * notif_id : VARCHAR <<PK>> <<FK>>
   --
-  * read_at : TIMESTAMP
 }
-Warehouse ||--o{ AppUser : menaungi
 Warehouse ||--o{ DailyData : mencatat
 Warehouse ||--o{ Prediction : memiliki
 Warehouse ||--|| OperationalConfig : diatur oleh
@@ -212,12 +266,13 @@ Warehouse ||--o{ ConfigHistory : mengaudit
 Warehouse ||--o{ DecisionLog : mencatat keputusan
 Prediction ||--o| ManpowerRecommendation : menghasilkan
 Prediction ||--o{ PredictionFeatureImportance : dijelaskan oleh
+Prediction ||--o{ PredictionNote : diberi catatan
 Prediction ||--o{ DecisionLog : diputuskan melalui
 AppUser ||--o{ DecisionLog : membuat
-AppUser |o--o{ Prediction : menginput actual
-AppUser ||--o{ OperationalConfig : memperbarui
+AppUser |o--o{ Prediction : menginput actual / memutuskan
 AppUser ||--o{ ConfigHistory : mengubah
-ConfigHistory ||--|{ ConfigHistoryDetail : terdiri atas
+BatchLog ||--o{ BatchEvaluatedDate : mengevaluasi
+BatchLog |o--o{ Notification : dilaporkan dalam
 Notification ||--|{ NotificationAudience : ditujukan ke
 AppUser ||--o{ NotificationRead : membaca
 Notification ||--o{ NotificationRead : dibaca dalam

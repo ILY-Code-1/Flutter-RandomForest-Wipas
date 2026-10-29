@@ -294,23 +294,21 @@ class BerandaScreen extends ConsumerWidget {
           cardGap,
         ];
       case Role.manajer:
-        final decisions = ref.watch(decisionsForProvider(p.id)).valueOrNull ?? const [];
-        final last = decisions.isEmpty ? null : decisions.first;
         return [
           WipasCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Alokasi ${Fmt.date(p.targetDate)}', style: WipasText.heading.copyWith(fontSize: 18)),
               const SizedBox(height: WipasSpace.sm),
-              if (last == null)
+              if (!p.isDecided)
                 const WipasStatusBadge(StatusKind.belum, label: 'Menunggu persetujuan')
               else
-                WipasStatusBadge(last.isAdjusted ? StatusKind.disesuaikan : StatusKind.disetujui),
+                WipasStatusBadge(p.isAdjusted ? StatusKind.disesuaikan : StatusKind.disetujui),
               const SizedBox(height: WipasSpace.sm),
               Text('Setiap persetujuan dan penyesuaian manual tercatat di decision log.',
                   style: WipasText.body.copyWith(color: WipasColors.textSecondary)),
               const SizedBox(height: WipasSpace.md),
               WipasPrimaryButton(
-                label: last == null ? 'Tinjau & Setujui Alokasi' : 'Lihat alokasi',
+                label: p.isDecided ? 'Lihat alokasi' : 'Tinjau & Setujui Alokasi',
                 icon: Icons.check,
                 onPressed: () => context.go(Routes.manpower),
               ),

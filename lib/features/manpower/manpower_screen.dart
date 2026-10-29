@@ -113,17 +113,18 @@ class ManpowerScreen extends ConsumerWidget {
   List<Widget> _content(BuildContext context, WidgetRef ref, ManpowerData d, bool offline, bool readOnly, AppUser user) {
     final p = d.prediction!;
     final rec = p.manpower!.counts;
-    final last = d.decisions.isEmpty ? null : d.decisions.first;
-    final shown = last?.manpowerFinal ?? rec;
+    // Decision state comes from the prediction's App-owned decision_* fields.
+    final decided = p.isDecided;
+    final shown = p.decisionManpower ?? rec;
     final cfg = d.config;
     final today = ref.watch(todayProvider);
     final diff = p.targetDate.difference(today).inDays;
     final rel = diff == 0 ? 'hari ini' : (diff > 0 ? 'H+$diff' : 'H$diff');
 
     Widget status;
-    if (last == null) {
+    if (!decided) {
       status = const WipasStatusBadge(StatusKind.menunggu, label: 'Menunggu persetujuan Manajer');
-    } else if (last.isAdjusted) {
+    } else if (p.isAdjusted) {
       status = const WipasStatusBadge(StatusKind.disesuaikan, label: 'Disesuaikan manual');
     } else {
       status = const WipasStatusBadge(StatusKind.disetujui);
@@ -180,7 +181,7 @@ class ManpowerScreen extends ConsumerWidget {
         body: 'Ini adalah rekomendasi sistem. Keputusan akhir ada pada Manajer Operasional.',
       ),
       cardGap,
-      if (!readOnly && last == null) ...[
+      if (!readOnly && !decided) ...[
         WipasPrimaryButton(
           key: const Key('btn-setujui'),
           label: 'Setujui rekomendasi',
@@ -273,10 +274,10 @@ class ManpowerScreen extends ConsumerWidget {
     if (!ok || !context.mounted) return;
     try {
       await ref.read(repositoryProvider).addDecision(
-            predId: p.id,
+            prediction: p,
             uid: user.uid,
             name: user.displayName,
-            decision: DecisionLog.approved,
+            decision: DecisionStatus.approved,
             manpowerFinal: rec,
           );
       if (context.mounted) showWipasSnackBar(context, 'Rekomendasi disetujui dan dicatat di log.');
@@ -294,10 +295,10 @@ class ManpowerScreen extends ConsumerWidget {
     if (result == null || !context.mounted) return;
     try {
       await ref.read(repositoryProvider).addDecision(
-            predId: p.id,
+            prediction: p,
             uid: user.uid,
             name: user.displayName,
-            decision: DecisionLog.adjusted,
+            decision: DecisionStatus.adjusted,
             manpowerFinal: result.$1,
             reason: result.$2,
           );

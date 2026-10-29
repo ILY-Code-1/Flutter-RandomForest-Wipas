@@ -23,9 +23,11 @@ final csvSaverProvider = Provider<CsvSaver>((ref) => const CsvSaver());
 final riwayatRangeProvider = StateProvider.autoDispose<({DateTime? end, int days})>((ref) => (end: null, days: 7));
 
 class RiwayatData {
-  const RiwayatData({required this.rows, required this.decisions, required this.end, required this.days});
+  const RiwayatData({required this.rows, required this.deciderNames, required this.end, required this.days});
   final List<Prediction> rows; // newest first
-  final Map<String, DecisionLog> decisions;
+
+  /// prediction_id → name of the latest decider (Admin export only).
+  final Map<String, String> deciderNames;
   final DateTime end;
   final int days;
   DateTime get start => end.subtract(Duration(days: days - 1));
@@ -41,17 +43,18 @@ final riwayatDataProvider = Provider.autoDispose<AsyncValue<RiwayatData>>((ref) 
   final DateTime today = ref.watch(todayProvider);
   final DateTime end = range.end ?? latest.requireValue?.targetDate ?? today;
   final rows = ref.watch(predictionsInRangeProvider((end: end, days: range.days)));
-  // Viewers may not read decision_logs (security rules); never query them.
-  final decisions = AccessMatrix.canSeeDecisions(role)
+  // Decision status/final/note come from the prediction's decision_* fields.
+  // decision_logs is only read for the Admin CSV (names of deciders).
+  final decisions = AccessMatrix.canExportCsv(role)
       ? ref.watch(recentDecisionsProvider)
       : const AsyncData<List<DecisionLog>>([]);
   return combineAsync([rows, decisions], () {
-    final latestByPred = <String, DecisionLog>{};
+    final names = <String, String>{};
     for (final d in decisions.requireValue) {
-      latestByPred.putIfAbsent(d.predId, () => d); // list is newest first
+      names.putIfAbsent(d.predId, () => d.decidedByName); // list is newest first
     }
     final list = [...rows.requireValue]..sort((a, b) => b.targetDate.compareTo(a.targetDate));
-    return RiwayatData(rows: list, decisions: latestByPred, end: end, days: range.days);
+    return RiwayatData(rows: list, deciderNames: names, end: end, days: range.days);
   });
 });
 
@@ -73,7 +76,7 @@ class _RiwayatScreenState extends ConsumerState<RiwayatScreen> {
   Future<void> _runExport(RiwayatData d) async {
     setState(() => _export = ExportStatus.preparing);
     try {
-      final csv = CsvExport.build(d.rows, d.decisions);
+      final csv = CsvExport.build(d.rows, d.deciderNames);
       final name = CsvExport.fileName(d.start, d.end);
       final saver = ref.read(csvSaverProvider);
       final file = await saver.write(name, csv);
@@ -187,7 +190,7 @@ class _RiwayatScreenState extends ConsumerState<RiwayatScreen> {
               padding: const EdgeInsets.fromLTRB(WipasSpace.lg, 0, WipasSpace.lg, WipasSpace.lg),
               child: Text('Tidak ada data pada rentang ini.', style: WipasText.body.copyWith(color: WipasColors.textSecondary)),
             ),
-          for (final p in d.rows) _HistoryRow(p: p, decision: d.decisions[p.id], showDecision: showDecisions),
+          for (final p in d.rows) _HistoryRow(p: p, showDecision: showDecisions),
         ]),
       ),
     ];
@@ -256,9 +259,8 @@ class _RiwayatScreenState extends ConsumerState<RiwayatScreen> {
 }
 
 class _HistoryRow extends StatelessWidget {
-  const _HistoryRow({required this.p, required this.decision, required this.showDecision});
+  const _HistoryRow({required this.p, required this.showDecision});
   final Prediction p;
-  final DecisionLog? decision;
   final bool showDecision;
 
   @override
@@ -281,13 +283,13 @@ class _HistoryRow extends StatelessWidget {
         ]),
         if (showDecision) ...[
           const SizedBox(height: WipasSpace.sm),
-          if (decision == null)
+          if (!p.isDecided)
             const WipasInlineStatus(StatusKind.menunggu)
-          else if (decision!.isAdjusted) ...[
+          else if (p.isAdjusted) ...[
             const WipasInlineStatus(StatusKind.disesuaikan),
             Text(
-              '${adjustmentSummary(decision!.manpowerFinal ?? rec ?? const ManpowerCounts(rider: 0, driver: 0, opInbound: 0, opOutbound: 0), rec)}'
-              '${(decision!.reason ?? '').isEmpty ? '' : ' · alasan: ${decision!.reason}'}',
+              '${adjustmentSummary(p.decisionManpower ?? rec ?? const ManpowerCounts(rider: 0, driver: 0, opInbound: 0, opOutbound: 0), rec)}'
+              '${(p.decisionNote ?? '').isEmpty ? '' : ' · alasan: ${p.decisionNote}'}',
               style: WipasText.bodySmall.copyWith(color: WipasColors.textSecondary),
             ),
           ] else

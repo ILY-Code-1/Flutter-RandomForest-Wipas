@@ -1,5 +1,5 @@
-flutter test --reporter json — 2026-10-28 15:06
-lulus: 230  gagal: 0
+flutter test --reporter json — 2026-10-29 08:29
+lulus: 241  gagal: 0
 
 [GAGAL]
 
@@ -36,16 +36,16 @@ AccessMatrix admin on /prediksi is Access.readOnly
 AccessMatrix admin on /profil is Access.full
 AccessMatrix admin on /riwayat is Access.full
 AccessMatrix capabilities
-AccessMatrix manajer on /beranda is Access.full
-AccessMatrix manajer on /evaluasi is Access.full
-AccessMatrix manajer on /input-actual is Access.none
-AccessMatrix manajer on /konfigurasi is Access.full
-AccessMatrix manajer on /lainnya is Access.full
-AccessMatrix manajer on /manpower is Access.full
-AccessMatrix manajer on /notifikasi is Access.full
-AccessMatrix manajer on /prediksi is Access.readOnly
-AccessMatrix manajer on /profil is Access.full
-AccessMatrix manajer on /riwayat is Access.readOnly
+AccessMatrix manager on /beranda is Access.full
+AccessMatrix manager on /evaluasi is Access.full
+AccessMatrix manager on /input-actual is Access.none
+AccessMatrix manager on /konfigurasi is Access.full
+AccessMatrix manager on /lainnya is Access.full
+AccessMatrix manager on /manpower is Access.full
+AccessMatrix manager on /notifikasi is Access.full
+AccessMatrix manager on /prediksi is Access.readOnly
+AccessMatrix manager on /profil is Access.full
+AccessMatrix manager on /riwayat is Access.readOnly
 AccessMatrix public routes are open, unknown routes are denied
 AccessMatrix supervisor on /beranda is Access.full
 AccessMatrix supervisor on /evaluasi is Access.none
@@ -89,7 +89,7 @@ Beranda per role manajer: approval card, no Input Actual
 Beranda per role supervisor: Input Actual only, manpower read-only, no Evaluasi link
 Beranda per role viewer: read-only, no manpower card or links
 Bottom navigation admin sees 5 tabs
-Bottom navigation manajer sees 5 tabs
+Bottom navigation manager sees 5 tabs
 Bottom navigation supervisor has no Evaluasi tab
 Bottom navigation viewer has no Manpower tab
 CSV export file name contains the range
@@ -139,7 +139,7 @@ Input Actual supervisor reminder, validation and save
 Konfigurasi capacity 0 shows a field error
 Konfigurasi ratio error disables save; valid change saves config + history
 Lainnya menu for admin
-Lainnya menu for manajer
+Lainnya menu for manager
 Lainnya menu for supervisor
 Lainnya menu for viewer
 Manpower decisions Cara hitung sheet shows the substituted formula
@@ -148,7 +148,7 @@ Manpower decisions manajer approves → decision_logs entry + status Disetujui
 Manpower decisions manual adjustment requires a reason
 Manpower decisions offline disables actions with a hint (buttons stay visible)
 Manpower: admin can act
-Manpower: manajer can act
+Manpower: manager can act
 Manpower: supervisor read-only without actions
 ManpowerCalculator 18.420 → 37 / 7 / 37 / 31 (design example)
 ManpowerCalculator exact multiples are not rounded up
@@ -159,10 +159,13 @@ ManpowerCalculator zero predicted needs zero people
 ManpowerCalculator.compute WB-MP-P1 sequential path: 18.420 → 37/7/37/31
 Model Degraded shows a danger banner on Beranda
 Model converters tolerate missing fields AppUser needs a valid role
+Model converters tolerate missing fields BatchLog reads duration_s, retries and skipped status
 Model converters tolerate missing fields Manpower requires all four counts
 Model converters tolerate missing fields ModelHealth threshold falls back to 1,15 × baseline
+Model converters tolerate missing fields Notification read state comes from read_by
 Model converters tolerate missing fields OperationalConfig falls back to defaults
 Model converters tolerate missing fields Other converters
+Model converters tolerate missing fields Prediction reads the contract input_features keys and decision_* fields
 Model converters tolerate missing fields Prediction with only a target date
 Model converters tolerate missing fields Prediction with wrong types does not throw
 Model converters tolerate missing fields Prediction without target date or data is skipped
@@ -171,19 +174,19 @@ Notifikasi filter and mark all read
 Notifikasi for admin includes batch notifications
 Notifikasi for supervisor excludes batch notifications (audience_roles)
 Prediksi (admin): read-only, Faktor pendorong hidden for supervisor only
-Prediksi (manajer): read-only, Faktor pendorong hidden for supervisor only
+Prediksi (manager): read-only, Faktor pendorong hidden for supervisor only
 Prediksi (supervisor): read-only, Faktor pendorong hidden for supervisor only
 Prediksi (viewer): read-only, Faktor pendorong hidden for supervisor only
 Prediksi H+2 without data shows empty state and "Kembali ke H+1"
 Riwayat 14 hari filter extends the list
 Riwayat admin: export + decisions
-Riwayat manajer: decisions without export
+Riwayat manager: decisions without export
 Riwayat supervisor: decisions without export
 Riwayat viewer: no export and no decision column
 RoleGuard forbidden routes redirect to beranda
 RoleGuard signed out is sent to login (with expired flag)
 RoleGuard unknown session goes to splash
-Route guard manajer cannot open /input-actual
+Route guard manager cannot open /input-actual
 Route guard supervisor cannot open /evaluasi
 Route guard supervisor cannot open /konfigurasi
 Route guard viewer cannot open /input-actual
@@ -229,6 +232,14 @@ roleGuard WB-RG-P6 signed out, session expired → /login?expired=1
 roleGuard WB-RG-P7 signed out → /login
 roleGuard WB-RG-P8 signed in on /login → /beranda
 roleGuard WB-RG-P9 signed in on /login/lupa → /beranda
+seed (degraded) follows the contract every document matches a contract collection with allowed + required fields
+seed (degraded) follows the contract nested maps, enums, dates and IDs follow the contract
+seed (empty) follows the contract every document matches a contract collection with allowed + required fields
+seed (empty) follows the contract nested maps, enums, dates and IDs follow the contract
+seed (fallback) follows the contract every document matches a contract collection with allowed + required fields
+seed (fallback) follows the contract nested maps, enums, dates and IDs follow the contract
+seed (normal) follows the contract every document matches a contract collection with allowed + required fields
+seed (normal) follows the contract nested maps, enums, dates and IDs follow the contract
 toViewState WB-VS-P1 loading
 toViewState WB-VS-P2 error
 toViewState WB-VS-P3 data without isEmpty callback, online

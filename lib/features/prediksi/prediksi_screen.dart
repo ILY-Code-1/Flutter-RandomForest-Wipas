@@ -162,6 +162,11 @@ class _TargetCard extends StatelessWidget {
           'Sumber: Data ${p.sourceLabel}',
           style: WipasText.bodySmall.copyWith(color: WipasColors.textSecondary),
         ),
+        // Script notes (fallback, imputation, backfill).
+        for (final note in p.notes) ...[
+          const SizedBox(height: WipasSpace.xs),
+          WipasInfoLine(child: Text(note)),
+        ],
         const SizedBox(height: WipasSpace.md),
         WipasStatusBadge(p.needsAttention ? StatusKind.perluPerhatian : StatusKind.normal,
             label: p.needsAttention ? 'Perlu Perhatian' : 'Deviasi normal'),

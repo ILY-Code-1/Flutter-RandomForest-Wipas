@@ -4,8 +4,10 @@ import '../domain/calculators.dart';
 import '../domain/role.dart';
 import '../format/formatters.dart';
 
-// Null-tolerant readers: missing or mistyped fields become null instead of
-// throwing, so the UI can fall back to empty states.
+// Converters for the Firestore contract `docs/firestore_schema.md` (v1.0,
+// owned by wipas-research). Readers are null-tolerant: missing or mistyped
+// fields become null instead of throwing, so the UI falls back to empty
+// states.
 
 int? _int(Object? v) => v is num ? v.round() : (v is String ? int.tryParse(v) : null);
 double? _double(Object? v) => v is num ? v.toDouble() : (v is String ? double.tryParse(v) : null);
@@ -13,6 +15,7 @@ String? _str(Object? v) => v is String ? v : null;
 bool _bool(Object? v) => v == true || v == 1;
 bool? _boolOrNull(Object? v) => v is bool ? v : (v is num ? v != 0 : null);
 Map<String, dynamic> _map(Object? v) => v is Map ? Map<String, dynamic>.from(v) : const {};
+List<String> _strList(Object? v) => v is List ? v.whereType<String>().toList() : const [];
 
 DateTime? _time(Object? v) {
   if (v is Timestamp) return v.toDate();
@@ -38,19 +41,43 @@ Map<String, double> _doubleMap(Object? v) {
   return out;
 }
 
-/// Data status values written by the batch script.
+ManpowerCounts? _counts(Object? raw) {
+  final m = _map(raw);
+  final rider = _int(m['rider']);
+  final driver = _int(m['driver']);
+  final opIn = _int(m['op_inbound']);
+  final opOut = _int(m['op_outbound']);
+  if (rider == null || driver == null || opIn == null || opOut == null) return null;
+  return ManpowerCounts(rider: rider, driver: driver, opInbound: opIn, opOutbound: opOut);
+}
+
+/// `predictions.data_status` values.
 class DataStatus {
   DataStatus._();
   static const complete = 'complete';
   static const fallbackH2 = 'incomplete_fallback_h2';
 }
 
-/// Ten predictor features (`input_features`). Values may be missing
-/// ("Belum diterima") when the H-1 data has not arrived.
+/// `predictions.status` values (written by the batch script).
+class PredictionStatus {
+  PredictionStatus._();
+  static const normal = 'Normal';
+  static const perluPerhatian = 'Perlu Perhatian';
+}
+
+/// `predictions.decision_status` / `decision_logs.decision_status` values.
+class DecisionStatus {
+  DecisionStatus._();
+  static const approved = 'approved';
+  static const adjusted = 'adjusted';
+}
+
+/// `predictions.input_features` — snapshot of the ten predictors.
+/// Flags (`campaign`, `hari_libur`, `payday`) are stored as 0/1 ints.
 class InputFeatures {
   const InputFeatures({
-    this.dayOfWeek,
-    this.month,
+    this.hari,
+    this.bulan,
     this.isCampaign,
     this.isHoliday,
     this.isPayday,
@@ -62,20 +89,21 @@ class InputFeatures {
   });
 
   factory InputFeatures.fromMap(Map<String, dynamic> m) => InputFeatures(
-        dayOfWeek: _int(m['day_of_week']),
-        month: _int(m['month']),
-        isCampaign: _boolOrNull(m['is_campaign']),
-        isHoliday: _boolOrNull(m['is_holiday']),
-        isPayday: _boolOrNull(m['is_payday']),
+        hari: _int(m['hari']),
+        bulan: _int(m['bulan']),
+        isCampaign: _boolOrNull(m['campaign']),
+        isHoliday: _boolOrNull(m['hari_libur']),
+        isPayday: _boolOrNull(m['payday']),
         pickupRequestH1: _int(m['pickup_request_h1']),
         projectionInbound: _int(m['projection_inbound']),
         backlogH1: _int(m['backlog_h1']),
-        actualInboundH2: _int(m['actual_inbound_h2']),
-        actualInboundH1: _int(m['actual_inbound_h1']),
+        actualInboundH2: _int(m['actual_h2']),
+        actualInboundH1: _int(m['actual_h1']),
       );
 
-  final int? dayOfWeek;
-  final int? month;
+  /// Day of week, 0 = Senin … 6 = Minggu (pandas `dayofweek`).
+  final int? hari;
+  final int? bulan;
   final bool? isCampaign;
   final bool? isHoliday;
   final bool? isPayday;
@@ -86,37 +114,38 @@ class InputFeatures {
   final int? actualInboundH1;
 }
 
-/// Display labels for feature keys (used by feature importance bars).
+/// Display labels for feature keys (`input_features` / `feature_importance`).
 const featureLabels = <String, String>{
-  'actual_inbound_h1': 'Actual Inbound H-1',
+  'actual_h1': 'Actual Inbound H-1',
   'pickup_request_h1': 'Pickup Request H-1',
   'backlog_h1': 'Backlog H-1',
-  'actual_inbound_h2': 'Actual Inbound H-2',
+  'actual_h2': 'Actual Inbound H-2',
   'projection_inbound': 'Projection Inbound',
-  'is_campaign': 'Campaign',
-  'is_payday': 'Payday',
-  'is_holiday': 'Hari Libur',
-  'day_of_week': 'Hari',
-  'month': 'Bulan',
+  'campaign': 'Campaign',
+  'payday': 'Payday',
+  'hari_libur': 'Hari Libur',
+  'hari': 'Hari',
+  'bulan': 'Bulan',
 };
 
+/// `predictions.manpower` (recommendation computed by the script).
 class ManpowerRecommendation {
-  const ManpowerRecommendation({required this.counts, this.configSnapshot});
+  const ManpowerRecommendation({required this.counts, this.configSnapshot, this.snapshotSource});
 
   final ManpowerCounts counts;
   final CapacityConfig? configSnapshot;
 
+  /// `"firestore"` (from operational_configs) or `"default"` (config.yaml).
+  final String? snapshotSource;
+
   static ManpowerRecommendation? fromMap(Object? raw) {
-    final m = _map(raw);
-    final rider = _int(m['rider']);
-    final driver = _int(m['driver']);
-    final opIn = _int(m['op_inbound']);
-    final opOut = _int(m['op_outbound']);
-    if (rider == null || driver == null || opIn == null || opOut == null) return null;
-    final snap = m['config_snapshot'];
+    final counts = _counts(raw);
+    if (counts == null) return null;
+    final snap = _map(raw)['config_snapshot'];
     return ManpowerRecommendation(
-      counts: ManpowerCounts(rider: rider, driver: driver, opInbound: opIn, opOutbound: opOut),
+      counts: counts,
       configSnapshot: snap is Map ? OperationalConfig.fromMap(_map(snap)).capacity : null,
+      snapshotSource: snap is Map ? _str(snap['source']) : null,
     );
   }
 }
@@ -140,12 +169,20 @@ class Prediction {
     this.featureImportance = const {},
     this.manpower,
     this.isBackfill = false,
+    this.isDummyData = false,
+    this.notes = const [],
+    this.evaluated = false,
+    this.dailyErrorPct,
+    this.evaluatedAt,
     this.actualInbound,
     this.actualNote,
     this.actualInputBy,
     this.actualInputAt,
-    this.dailyErrorPct,
-    this.evaluated = false,
+    this.decisionStatus,
+    this.decisionBy,
+    this.decisionAt,
+    this.decisionNote,
+    this.decisionManpower,
   });
 
   static Prediction? fromDoc(String id, Map<String, dynamic>? m) {
@@ -169,12 +206,20 @@ class Prediction {
       featureImportance: _doubleMap(m['feature_importance']),
       manpower: ManpowerRecommendation.fromMap(m['manpower']),
       isBackfill: _bool(m['is_backfill']),
+      isDummyData: _bool(m['is_dummy_data']),
+      notes: _strList(m['notes']),
+      evaluated: _bool(m['evaluated']),
+      dailyErrorPct: _double(m['daily_error_pct']),
+      evaluatedAt: _time(m['evaluated_at']),
       actualInbound: _int(m['actual_inbound']),
       actualNote: _str(m['actual_note']),
       actualInputBy: _str(m['actual_input_by']),
       actualInputAt: _time(m['actual_input_at']),
-      dailyErrorPct: _double(m['daily_error_pct']),
-      evaluated: _bool(m['evaluated']),
+      decisionStatus: _str(m['decision_status']),
+      decisionBy: _str(m['decision_by']),
+      decisionAt: _time(m['decision_at']),
+      decisionNote: _str(m['decision_note']),
+      decisionManpower: _counts(m['decision_manpower']),
     );
   }
 
@@ -196,12 +241,21 @@ class Prediction {
   final Map<String, double> featureImportance;
   final ManpowerRecommendation? manpower;
   final bool isBackfill;
+  final bool isDummyData;
+  final List<String> notes;
+  final bool evaluated;
+  final double? dailyErrorPct;
+  final DateTime? evaluatedAt;
+  // App-owned fields.
   final int? actualInbound;
   final String? actualNote;
   final String? actualInputBy;
   final DateTime? actualInputAt;
-  final double? dailyErrorPct;
-  final bool evaluated;
+  final String? decisionStatus;
+  final String? decisionBy;
+  final DateTime? decisionAt;
+  final String? decisionNote;
+  final ManpowerCounts? decisionManpower;
 
   bool get isFallback => dataStatus != DataStatus.complete;
 
@@ -215,6 +269,9 @@ class Prediction {
 
   /// Source label ("H-1"/"H-2").
   String get sourceLabel => source ?? (isFallback ? 'H-2' : 'H-1');
+
+  bool get isDecided => decisionStatus != null;
+  bool get isAdjusted => decisionStatus == DecisionStatus.adjusted;
 }
 
 /// `operational_configs/{wh}`
@@ -240,11 +297,13 @@ class OperationalConfig {
 
   final CapacityConfig capacity;
   final String? rounding;
+
+  /// uid, or `"wipas-research:seed-config"` when seeded by the script.
   final String? updatedBy;
   final DateTime? updatedAt;
 }
 
-/// `decision_logs/{auto}` (append-only)
+/// `decision_logs/{auto}` (App-owned, append-only).
 class DecisionLog {
   const DecisionLog({
     required this.id,
@@ -254,67 +313,98 @@ class DecisionLog {
     required this.decidedByName,
     required this.decision,
     required this.manpowerFinal,
+    this.recommended,
+    this.targetDate,
     this.reason,
     this.decidedAt,
   });
 
-  static const approved = 'approved';
-  static const adjusted = 'adjusted';
-
   static DecisionLog? fromDoc(String id, Map<String, dynamic>? m) {
     if (m == null) return null;
-    final decision = _str(m['decision']);
+    final decision = _str(m['decision_status']);
     if (decision == null) return null;
-    final mp = ManpowerRecommendation.fromMap(m['manpower_final']);
     return DecisionLog(
       id: id,
-      predId: _str(m['pred_id']) ?? '',
+      predId: _str(m['prediction_id']) ?? '',
       whId: _str(m['wh_id']) ?? '',
+      targetDate: _date(m['target_date']),
       decidedBy: _str(m['decided_by']) ?? '',
       decidedByName: _str(m['decided_by_name']) ?? '',
       decision: decision,
-      manpowerFinal: mp?.counts,
-      reason: _str(m['reason']),
+      recommended: _counts(m['recommended']),
+      manpowerFinal: _counts(m['final']),
+      reason: _str(m['note']),
       decidedAt: _time(m['decided_at']),
     );
   }
 
   final String id;
+
+  /// `prediction_id`
   final String predId;
   final String whId;
+  final DateTime? targetDate;
   final String decidedBy;
+
+  /// App extension (not in the contract's suggested list): rules only let a
+  /// user read their own profile, so the name is copied at write time.
   final String decidedByName;
+
+  /// `decision_status`: approved | adjusted
   final String decision;
+  final ManpowerCounts? recommended;
+
+  /// `final`
   final ManpowerCounts? manpowerFinal;
+
+  /// `note`
   final String? reason;
   final DateTime? decidedAt;
 
-  bool get isAdjusted => decision == adjusted;
+  bool get isAdjusted => decision == DecisionStatus.adjusted;
 }
 
-/// `config_history/{auto}` (append-only)
+/// `operational_configs/{wh}/history/{auto}` (App-owned): a copy of the
+/// config fields plus `changed_by`, `changed_at`, `note`.
 class ConfigHistoryEntry {
   const ConfigHistoryEntry({
     required this.id,
     required this.changedByName,
+    this.changedBy,
     this.changedAt,
-    this.oldValues = const {},
-    this.newValues = const {},
+    this.note,
+    this.values = const {},
   });
 
   factory ConfigHistoryEntry.fromDoc(String id, Map<String, dynamic> m) => ConfigHistoryEntry(
         id: id,
-        changedByName: _str(m['changed_by_name']) ?? '',
+        changedBy: _str(m['changed_by']),
+        changedByName: _str(m['changed_by_name']) ?? _str(m['changed_by']) ?? '',
         changedAt: _time(m['changed_at']),
-        oldValues: _doubleMap(m['old_values']),
-        newValues: _doubleMap(m['new_values']),
+        note: _str(m['note']),
+        values: {
+          for (final k in const [
+            'capacity_rider',
+            'capacity_driver',
+            'capacity_op_inbound',
+            'capacity_op_outbound',
+            'ratio_rider',
+            'ratio_driver',
+          ])
+            if (_double(m[k]) != null) k: _double(m[k])!,
+        },
       );
 
   final String id;
+  final String? changedBy;
   final String changedByName;
   final DateTime? changedAt;
-  final Map<String, double> oldValues;
-  final Map<String, double> newValues;
+
+  /// Human-readable change summary ("Capacity_Rider: 350 → 400; …").
+  final String? note;
+
+  /// Config values after the change.
+  final Map<String, double> values;
 }
 
 /// `model_health/{wh}` (written by the script; app only reads).
@@ -322,13 +412,21 @@ class ModelHealth {
   const ModelHealth({
     required this.status,
     this.rollingMae7d,
+    this.rollingWindowDays,
+    this.nPoints,
+    this.lastEvaluatedDate,
     this.baselineMae,
     this.driftThreshold,
+    this.driftFactor,
     this.modelVersion,
     this.maeValidation,
+    this.maeValidationPaket,
     this.rmse,
+    this.rmsePaket,
     this.r2,
     this.featureImportance = const {},
+    this.trainedAt,
+    this.isDummyData = false,
     this.updatedAt,
   });
 
@@ -337,33 +435,54 @@ class ModelHealth {
     return ModelHealth(
       status: _str(m['status']) ?? 'healthy',
       rollingMae7d: _double(m['rolling_mae_7d']),
+      rollingWindowDays: _int(m['rolling_window_days']),
+      nPoints: _int(m['n_points']),
+      lastEvaluatedDate: _date(m['last_evaluated_date']),
       baselineMae: _double(m['baseline_mae']),
       driftThreshold: _double(m['drift_threshold']),
+      driftFactor: _double(m['drift_factor']),
       modelVersion: _str(m['model_version']),
       maeValidation: _double(m['mae_validation']),
+      maeValidationPaket: _double(m['mae_validation_paket']),
       rmse: _double(m['rmse']),
+      rmsePaket: _double(m['rmse_paket']),
       r2: _double(m['r2']),
       featureImportance: _doubleMap(m['feature_importance']),
+      trainedAt: _time(m['trained_at']),
+      isDummyData: _bool(m['is_dummy_data']),
       updatedAt: _time(m['updated_at']),
     );
   }
 
   final String status;
   final double? rollingMae7d;
+  final int? rollingWindowDays;
+
+  /// Days in the rolling window (status stays healthy while < 7).
+  final int? nPoints;
+  final DateTime? lastEvaluatedDate;
   final double? baselineMae;
   final double? driftThreshold;
+  final double? driftFactor;
   final String? modelVersion;
   final double? maeValidation;
+  final double? maeValidationPaket;
   final double? rmse;
+  final double? rmsePaket;
   final double? r2;
   final Map<String, double> featureImportance;
+  final DateTime? trainedAt;
+  final bool isDummyData;
   final DateTime? updatedAt;
 
   bool get isDegraded => status == 'degraded';
 
-  /// Threshold stored by the script, else 1.15 × baseline.
-  double? get threshold =>
-      driftThreshold ?? (baselineMae == null ? null : ErrorMetrics.driftThreshold(baselineMae!));
+  /// Threshold stored by the script, else drift_factor (1,15) × baseline.
+  double? get threshold {
+    if (driftThreshold != null) return driftThreshold;
+    if (baselineMae == null) return null;
+    return driftFactor == null ? ErrorMetrics.driftThreshold(baselineMae!) : baselineMae! * driftFactor!;
+  }
 }
 
 /// `model_health_history/{wh}_{YYYYMMDD}`
@@ -388,7 +507,7 @@ class ModelHealthPoint {
   final double? driftThreshold;
 }
 
-/// `batch_logs/{wh}_{YYYYMMDD}`
+/// `batch_logs/{wh}_{YYYYMMDD}` (later runs: `_run2`, `_run3`, …)
 class BatchLog {
   const BatchLog({
     required this.status,
@@ -398,35 +517,56 @@ class BatchLog {
     this.source,
     this.targetDate,
     this.message,
+    this.error,
   });
+
+  static const success = 'success';
+  static const skipped = 'skipped';
+  static const failed = 'failed';
 
   static BatchLog? fromMap(Map<String, dynamic>? m) {
     if (m == null) return null;
     return BatchLog(
       status: _str(m['status']) ?? 'unknown',
       startedAt: _time(m['started_at']),
-      durationSec: _int(m['duration_sec']),
-      retryCount: _int(m['retry_count']) ?? 0,
+      durationSec: _int(m['duration_s']),
+      retryCount: _int(m['retries']) ?? 0,
       source: _str(m['source']),
       targetDate: _date(m['target_date']),
       message: _str(m['message']),
+      error: _str(m['error']),
     );
   }
 
   final String status;
   final DateTime? startedAt;
+
+  /// `duration_s`, rounded to whole seconds.
   final int? durationSec;
+
+  /// `retries`
   final int retryCount;
   final String? source;
   final DateTime? targetDate;
   final String? message;
+  final String? error;
 
-  bool get isSuccess => status == 'success';
+  /// "skipped" (prediction already existed) is not a failure.
+  bool get isSuccess => status == success || status == skipped;
 }
 
 /// `dataset_status/{wh}`
 class DatasetStatus {
-  const DatasetStatus({this.lastImportAt, this.rangeStart, this.rangeEnd, this.rowCount, this.sourceFile});
+  const DatasetStatus({
+    this.lastImportAt,
+    this.rangeStart,
+    this.rangeEnd,
+    this.rowCount,
+    this.labeledCount,
+    this.lastActualDate,
+    this.sourceFile,
+    this.isDummyData = false,
+  });
 
   static DatasetStatus? fromMap(Map<String, dynamic>? m) {
     if (m == null) return null;
@@ -435,7 +575,10 @@ class DatasetStatus {
       rangeStart: _date(m['range_start']),
       rangeEnd: _date(m['range_end']),
       rowCount: _int(m['row_count']),
+      labeledCount: _int(m['labeled_count']),
+      lastActualDate: _date(m['last_actual_date']),
       sourceFile: _str(m['source_file']),
+      isDummyData: _bool(m['is_dummy_data']),
     );
   }
 
@@ -443,7 +586,10 @@ class DatasetStatus {
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
   final int? rowCount;
+  final int? labeledCount;
+  final DateTime? lastActualDate;
   final String? sourceFile;
+  final bool isDummyData;
 }
 
 /// Notification types.
@@ -462,10 +608,12 @@ class AppNotification {
     required this.type,
     required this.title,
     required this.body,
+    this.severity,
     this.whId,
     this.targetDate,
     this.createdAt,
     this.audienceRoles = const [],
+    this.readBy = const [],
   });
 
   static AppNotification? fromDoc(String id, Map<String, dynamic>? m) {
@@ -475,12 +623,12 @@ class AppNotification {
       type: _str(m['type']) ?? NotifType.batch,
       title: _str(m['title']) ?? '',
       body: _str(m['body']) ?? '',
+      severity: _str(m['severity']),
       whId: _str(m['wh_id']),
       targetDate: _date(m['target_date']),
       createdAt: _time(m['created_at']),
-      audienceRoles: (m['audience_roles'] is List)
-          ? (m['audience_roles'] as List).whereType<String>().toList()
-          : const [],
+      audienceRoles: _strList(m['audience_roles']),
+      readBy: _strList(m['read_by']),
     );
   }
 
@@ -488,13 +636,22 @@ class AppNotification {
   final String type;
   final String title;
   final String body;
+
+  /// info | warning | error
+  final String? severity;
   final String? whId;
   final DateTime? targetDate;
   final DateTime? createdAt;
   final List<String> audienceRoles;
+
+  /// App-owned: uids that have read this notification.
+  final List<String> readBy;
+
+  bool isReadBy(String uid) => readBy.contains(uid);
 }
 
-/// `users/{uid}`
+/// `users/{uid}` — contract fields: `role`, `name`. Email comes from Firebase
+/// Auth; the warehouse defaults to WH-CKG-01 when `wh_id` is absent.
 class AppUser {
   const AppUser({
     required this.uid,
@@ -502,7 +659,6 @@ class AppUser {
     required this.displayName,
     required this.email,
     required this.whId,
-    this.jobTitle,
   });
 
   static AppUser? fromDoc(String uid, Map<String, dynamic>? m, {String? fallbackEmail}) {
@@ -512,10 +668,9 @@ class AppUser {
     return AppUser(
       uid: uid,
       role: role,
-      displayName: _str(m['display_name']) ?? fallbackEmail ?? uid,
-      email: _str(m['email']) ?? fallbackEmail ?? '',
+      displayName: _str(m['name']) ?? fallbackEmail ?? uid,
+      email: fallbackEmail ?? _str(m['email']) ?? '',
       whId: _str(m['wh_id']) ?? 'WH-CKG-01',
-      jobTitle: _str(m['job_title']),
     );
   }
 
@@ -524,7 +679,6 @@ class AppUser {
   final String displayName;
   final String email;
   final String whId;
-  final String? jobTitle;
 
   /// "AW" from "Admin WIPAS · Shift Lead".
   String get initials {
@@ -534,17 +688,18 @@ class AppUser {
     return (words[0][0] + words[1][0]).toUpperCase();
   }
 
-  /// Label on the role chip (e.g. "Manajer Warehouse").
-  String get roleChipLabel => jobTitle ?? role.label;
+  /// Label on the role chip (from the design).
+  String get roleChipLabel => role.chipLabel;
 }
 
-/// `warehouses/{wh}`
+/// `warehouses/{wh}` — `name`, `code`, `timezone`, `created_at`.
 class Warehouse {
-  const Warehouse({required this.id, required this.name});
+  const Warehouse({required this.id, required this.name, this.timezone});
 
   factory Warehouse.fromMap(String id, Map<String, dynamic>? m) =>
-      Warehouse(id: id, name: _str(m?['name']) ?? id);
+      Warehouse(id: _str(m?['code']) ?? id, name: _str(m?['name']) ?? id, timezone: _str(m?['timezone']));
 
   final String id;
   final String name;
+  final String? timezone;
 }

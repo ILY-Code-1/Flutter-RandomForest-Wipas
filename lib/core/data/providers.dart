@@ -110,17 +110,11 @@ final notificationsProvider = StreamProvider.autoDispose<List<AppNotification>>(
   return _tracked(ref, ref.watch(repositoryProvider).watchNotifications(user.role.id));
 });
 
-final readIdsProvider = StreamProvider.autoDispose<Set<String>>((ref) {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return Stream.value(const {});
-  return ref.watch(repositoryProvider).watchReadIds(user.uid);
-});
-
-/// Number of unread notifications (bell badge).
+/// Number of unread notifications (bell badge), from `read_by`.
 final unreadCountProvider = Provider.autoDispose<int>((ref) {
+  final uid = ref.watch(currentUserProvider)?.uid;
   final list = ref.watch(notificationsProvider).valueOrNull ?? const [];
-  final read = ref.watch(readIdsProvider).valueOrNull ?? const {};
-  return list.where((n) => !read.contains(n.id)).length;
+  return uid == null ? 0 : list.where((n) => !n.isReadBy(uid)).length;
 });
 
 /// Failed load attempts per screen key; after 3 the error state suggests

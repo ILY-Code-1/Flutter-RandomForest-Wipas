@@ -63,3 +63,7 @@ Log kemajuan sesi otonom. Hanya hasil yang benar-benar dijalankan yang dicatat.
 - Blackbox 48 skenario (46 Lulus, 2 Belum diuji); whitebox 42 basis path (41 Lulus, 1 Belum diuji); UAT 24 (Belum diuji).
 
 ## TAHAP 3 — Penutup: laporan akhir diberikan di chat.
+
+## Sinkronisasi kontrak Firestore v1.0 (29 Okt 2026)
+- Sumber: `docs/firestore_schema.md` dari repo riset. 29 selisih diperbaiki di sisi aplikasi; rincian di `docs/SYNC_REPORT.md`.
+- `flutter analyze`: No issues found! · `flutter test`: +241 All tests passed! · `tools/check_docs.py`: 127/127.

@@ -3,6 +3,8 @@
 Format: **butir** — alasan — dampak.
 
 ## Data & kontrak
+> **Diperbarui 29 Okt 2026:** `docs/firestore_schema.md` kini berasal dari repo riset (kontrak v1.0). Butir 1–6 di bawah digantikan oleh kontrak; selisih dan perbaikannya ada di `docs/SYNC_REPORT.md`.
+
 1. **`docs/firestore_schema.md` dibuat di repo ini** dari tabel kontrak prompt — berkas belum ada saat pengerjaan — field bertanda [USULAN] perlu disinkronkan ke `wipas-research`.
 2. **Tanggal kalender disimpan sebagai string `YYYY-MM-DD` (WIB)** — query rentang tanggal sederhana dan tidak bergeser karena zona waktu — script Python harus menulis format yang sama.
 3. **`day_of_week` 1 = Senin … 7 = Minggu** (ISO) — konsisten dengan Dart `DateTime.weekday` — perlu disamakan di script.

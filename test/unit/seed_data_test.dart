@@ -12,7 +12,8 @@ void main() {
     final h1 = _doc(docs, 'predictions/pred_WH-CKG-01_20261009');
     expect(h1['predicted'], 18420);
     expect(h1['projection'], 15900);
-    expect(h1['deviation_pct'], 15.8);
+    expect(h1['deviation_pct'], 15.85); // contract: 2 decimals
+    expect(h1['status'], 'Perlu Perhatian');
     expect(h1['alert'], isTrue);
     expect(h1['actual_inbound'], isNull);
     final mp = h1['manpower'] as Map;
@@ -58,7 +59,8 @@ void main() {
     final h1 = _doc(docs, 'predictions/pred_WH-CKG-01_20261009');
     expect(h1['data_status'], 'incomplete_fallback_h2');
     expect(h1['source'], 'H-2');
-    expect((h1['input_features'] as Map)['actual_inbound_h1'], isNull);
+    expect((h1['input_features'] as Map)['actual_h1'], isNull);
+    expect((h1['notes'] as List).single, contains('Fallback H-2'));
     expect(docs.any((d) => d.path.startsWith('notifications/incomplete_')), isTrue);
   });
 
@@ -72,9 +74,14 @@ void main() {
   test('H+1 has no decision; adjusted decisions carry a reason', () {
     final docs = buildSeed(today: testToday, uids: testUids);
     final logs = docs.where((d) => d.path.startsWith('decision_logs/')).toList();
-    expect(logs.where((d) => d.data['pred_id'] == 'pred_WH-CKG-01_20261009'), isEmpty);
-    for (final d in logs.where((d) => d.data['decision'] == 'adjusted')) {
-      expect((d.data['reason'] as String).isNotEmpty, isTrue);
+    expect(logs.where((d) => d.data['prediction_id'] == 'pred_WH-CKG-01_20261009'), isEmpty);
+    expect(_doc(docs, 'predictions/pred_WH-CKG-01_20261009').containsKey('decision_status'), isFalse);
+    for (final d in logs.where((d) => d.data['decision_status'] == 'adjusted')) {
+      expect((d.data['note'] as String).isNotEmpty, isTrue);
+      // The prediction carries the same decision in its App-owned fields.
+      final p = _doc(docs, 'predictions/${d.data['prediction_id']}');
+      expect(p['decision_status'], 'adjusted');
+      expect(p['decision_manpower'], d.data['final']);
     }
   });
 }

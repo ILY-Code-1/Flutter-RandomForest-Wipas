@@ -55,12 +55,19 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Setujui'));
       await settle(tester);
 
-      final logs = await app.firestore.collection('decision_logs').where('pred_id', isEqualTo: _h1).get();
+      final logs = await app.firestore.collection('decision_logs').where('prediction_id', isEqualTo: _h1).get();
       expect(logs.docs, hasLength(1));
       final d = logs.docs.single.data();
-      expect(d['decision'], 'approved');
+      expect(d['decision_status'], 'approved');
       expect(d['decided_by'], uidFor('manajer'));
-      expect(d['manpower_final'], {'rider': 37, 'driver': 7, 'op_inbound': 37, 'op_outbound': 31});
+      expect(d['final'], {'rider': 37, 'driver': 7, 'op_inbound': 37, 'op_outbound': 31});
+      expect(d['recommended'], d['final']);
+      expect(d['target_date'], '2026-10-09');
+      // App-owned decision_* fields on the prediction (contract).
+      final pred = (await app.firestore.doc('predictions/$_h1').get()).data()!;
+      expect(pred['decision_status'], 'approved');
+      expect(pred['decision_by'], uidFor('manajer'));
+      expect(pred['decision_manpower'], d['final']);
       expect(find.text('Disetujui'), findsOneWidget);
       expect(find.byKey(const Key('btn-setujui')), findsNothing);
     });
@@ -71,8 +78,10 @@ void main() {
       await settle(tester);
       await tester.tap(find.text('Batal'));
       await settle(tester);
-      final logs = await app.firestore.collection('decision_logs').where('pred_id', isEqualTo: _h1).get();
+      final logs = await app.firestore.collection('decision_logs').where('prediction_id', isEqualTo: _h1).get();
       expect(logs.docs, isEmpty);
+      final pred = (await app.firestore.doc('predictions/$_h1').get()).data()!;
+      expect(pred.containsKey('decision_status'), isFalse);
     });
 
     testWidgets('manual adjustment requires a reason', (tester) async {
@@ -93,12 +102,16 @@ void main() {
       await tester.tap(find.byKey(const Key('btn-simpan-penyesuaian')));
       await settle(tester);
 
-      final logs = await app.firestore.collection('decision_logs').where('pred_id', isEqualTo: _h1).get();
+      final logs = await app.firestore.collection('decision_logs').where('prediction_id', isEqualTo: _h1).get();
       expect(logs.docs, hasLength(1));
       final d = logs.docs.single.data();
-      expect(d['decision'], 'adjusted');
-      expect(d['reason'], 'Antrean backlog 640 paket perlu tambahan kurir');
-      expect((d['manpower_final'] as Map)['rider'], 40);
+      expect(d['decision_status'], 'adjusted');
+      expect(d['note'], 'Antrean backlog 640 paket perlu tambahan kurir');
+      expect((d['final'] as Map)['rider'], 40);
+      final pred = (await app.firestore.doc('predictions/$_h1').get()).data()!;
+      expect(pred['decision_status'], 'adjusted');
+      expect(pred['decision_note'], 'Antrean backlog 640 paket perlu tambahan kurir');
+      expect((pred['decision_manpower'] as Map)['rider'], 40);
       expect(find.text('Disesuaikan manual'), findsOneWidget);
       expect(find.textContaining('Rider 40 (rekomendasi 37)'), findsOneWidget);
     });
@@ -183,8 +196,16 @@ void main() {
       expect(cfg.data()!['capacity_rider'], 400);
       expect(cfg.data()!['capacity_op_outbound'], 650);
       expect(cfg.data()!['updated_by'], uidFor('manajer'));
-      final hist = await app.firestore.collection('config_history').get();
+      expect(cfg.data()!['wh_id'], 'WH-CKG-01');
+      final hist = await app.firestore
+          .collection('operational_configs/WH-CKG-01/history')
+          .orderBy('changed_at', descending: true)
+          .get();
       expect(hist.docs, hasLength(4));
+      final latest = hist.docs.first.data();
+      expect(latest['capacity_rider'], 400);
+      expect(latest['changed_by'], uidFor('manajer'));
+      expect(latest['note'], 'Capacity_Rider: 350 → 400; Capacity_Op_Outbound: 600 → 650');
       expect(find.text('Capacity_Rider: 350 → 400'), findsOneWidget);
     });
 
@@ -211,8 +232,12 @@ void main() {
       await settle(tester);
       await tester.tap(find.text('Tandai semua dibaca'));
       await settle(tester);
-      final reads = await app.firestore.collection('users/${uidFor('admin')}/notification_reads').get();
-      expect(reads.docs, hasLength(4));
+      final notifs = await app.firestore.collection('notifications').get();
+      final mine = notifs.docs.where((d) => (d.data()['audience_roles'] as List).contains('admin'));
+      expect(mine, hasLength(4));
+      for (final d in mine) {
+        expect(d.data()['read_by'], contains(uidFor('admin')));
+      }
       expect(find.text('0 belum dibaca · 4 total'), findsOneWidget);
     });
 

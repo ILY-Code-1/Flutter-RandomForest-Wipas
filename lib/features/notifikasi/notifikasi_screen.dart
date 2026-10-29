@@ -30,9 +30,9 @@ _TypeStyle _style(String type) => switch (type) {
       _ => const _TypeStyle('Batch', Icons.check_circle_outline, WipasColors.successTint, WipasColors.successText),
     };
 
-bool matchesFilter(AppNotification n, NotifFilter f, Set<String> read) => switch (f) {
+bool matchesFilter(AppNotification n, NotifFilter f, String uid) => switch (f) {
       NotifFilter.semua => true,
-      NotifFilter.belumDibaca => !read.contains(n.id),
+      NotifFilter.belumDibaca => !n.isReadBy(uid),
       NotifFilter.deviasi => n.type == NotifType.deviation,
       NotifFilter.model => n.type == NotifType.degraded,
       NotifFilter.data => n.type == NotifType.incomplete,
@@ -40,15 +40,17 @@ bool matchesFilter(AppNotification n, NotifFilter f, Set<String> read) => switch
     };
 
 class NotifData {
-  const NotifData(this.items, this.read);
+  const NotifData(this.items, this.uid);
   final List<AppNotification> items;
-  final Set<String> read;
+  final String uid;
+
+  bool isRead(AppNotification n) => n.isReadBy(uid);
 }
 
 final notifDataProvider = Provider.autoDispose<AsyncValue<NotifData>>((ref) {
   final items = ref.watch(notificationsProvider);
-  final read = ref.watch(readIdsProvider);
-  return combineAsync([items, read], () => NotifData(items.requireValue, read.requireValue));
+  final uid = ref.watch(currentUserProvider)?.uid ?? '';
+  return combineAsync([items], () => NotifData(items.requireValue, uid));
 });
 
 class NotifikasiScreen extends ConsumerWidget {
@@ -75,7 +77,7 @@ class NotifikasiScreen extends ConsumerWidget {
         _ => WipasStateView<NotifData>(
             state: state,
             attempts: ref.watch(retryCountProvider('notifikasi')),
-            onRetry: () => retryScreen(ref, 'notifikasi', [notificationsProvider, readIdsProvider]),
+            onRetry: () => retryScreen(ref, 'notifikasi', [notificationsProvider]),
             empty: const SizedBox.shrink(),
             builder: (_, _, _) => const [],
           ),
@@ -84,8 +86,8 @@ class NotifikasiScreen extends ConsumerWidget {
   }
 
   Widget _list(BuildContext context, WidgetRef ref, NotifData d, NotifFilter filter, AppUser user, bool offline) {
-    final unread = d.items.where((n) => !d.read.contains(n.id)).length;
-    final shown = d.items.where((n) => matchesFilter(n, filter, d.read)).toList();
+    final unread = d.items.where((n) => !d.isRead(n)).length;
+    final shown = d.items.where((n) => matchesFilter(n, filter, d.uid)).toList();
     final repo = ref.read(repositoryProvider);
     final labels = {
       NotifFilter.semua: 'Semua',
@@ -97,7 +99,7 @@ class NotifikasiScreen extends ConsumerWidget {
     };
 
     void open(AppNotification n) {
-      if (!d.read.contains(n.id)) repo.markRead(user.uid, [n.id]);
+      if (!d.isRead(n)) repo.markRead(user.uid, [n.id]);
       final role = user.role;
       final target = switch (n.type) {
         NotifType.degraded || NotifType.batch => AccessMatrix.canSeeEvaluasi(role) ? Routes.evaluasi : Routes.prediksi,
@@ -131,7 +133,7 @@ class NotifikasiScreen extends ConsumerWidget {
           if (unread > 0)
             WipasTextButton(
               label: 'Tandai semua dibaca',
-              onPressed: () => repo.markRead(user.uid, d.items.where((n) => !d.read.contains(n.id)).map((n) => n.id)),
+              onPressed: () => repo.markRead(user.uid, d.items.where((n) => !d.isRead(n)).map((n) => n.id)),
             ),
         ]),
       ),
@@ -171,7 +173,7 @@ class NotifikasiScreen extends ConsumerWidget {
                           title: n.title,
                           body: n.body,
                           time: n.createdAt == null ? '' : Fmt.dateTime(n.createdAt!),
-                          unread: !d.read.contains(n.id),
+                          unread: !d.isRead(n),
                           onTap: () => open(n),
                         );
                       }),

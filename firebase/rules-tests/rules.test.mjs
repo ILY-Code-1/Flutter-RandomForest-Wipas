@@ -9,6 +9,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   addDoc,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -24,7 +25,8 @@ import {
 const PROJECT_ID = 'demo-wipas';
 const WH = 'WH-CKG-01';
 const PRED = `pred_${WH}_20261009`;
-const ROLES = ['admin', 'manajer', 'supervisor', 'viewer'];
+// Contract role values (docs/firestore_schema.md v1.0).
+const ROLES = ['admin', 'manager', 'supervisor', 'viewer'];
 
 let env;
 
@@ -39,6 +41,7 @@ const actualUpdate = (role, value = 17560) => ({
 });
 
 const validConfig = (role) => ({
+  wh_id: WH,
   capacity_rider: 400,
   capacity_driver: 800,
   capacity_op_inbound: 500,
@@ -50,17 +53,41 @@ const validConfig = (role) => ({
   updated_at: serverTimestamp(),
 });
 
+const MP = { rider: 37, driver: 7, op_inbound: 37, op_outbound: 31 };
+
 const decision = (role, extra = {}) => ({
-  pred_id: PRED,
   wh_id: WH,
+  target_date: '2026-10-09',
+  prediction_id: PRED,
+  recommended: MP,
+  final: MP,
+  decision_status: 'approved',
+  note: null,
   decided_by: `uid-${role}`,
   decided_by_name: role,
-  decision: 'approved',
-  manpower_final: { rider: 37, driver: 7, op_inbound: 37, op_outbound: 31 },
-  reason: null,
   decided_at: serverTimestamp(),
   ...extra,
 });
+
+const decisionFields = (role, extra = {}) => ({
+  decision_status: 'approved',
+  decision_by: `uid-${role}`,
+  decision_at: serverTimestamp(),
+  decision_note: null,
+  decision_manpower: MP,
+  ...extra,
+});
+
+const history = (role, extra = {}) => ({
+  ...validConfig(role),
+  changed_by: `uid-${role}`,
+  changed_by_name: role,
+  changed_at: serverTimestamp(),
+  note: 'Capacity_Rider: 350 → 400',
+  ...extra,
+});
+
+const NOTIF = `deviation_${WH}_20261009`;
 
 before(async () => {
   const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080').split(':');
@@ -83,7 +110,7 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const fs = ctx.firestore();
     for (const role of ROLES) {
-      await setDoc(doc(fs, 'users', `uid-${role}`), { role, display_name: role, email: `${role}@x`, wh_id: WH });
+      await setDoc(doc(fs, 'users', `uid-${role}`), { role, name: role });
     }
     await setDoc(doc(fs, 'predictions', PRED), {
       wh_id: WH,
@@ -92,9 +119,10 @@ beforeEach(async () => {
       projection: 15900,
       deviation_pct: 15.8,
       alert: true,
-      manpower: { rider: 37, driver: 7, op_inbound: 37, op_outbound: 31 },
+      manpower: MP,
     });
     await setDoc(doc(fs, 'operational_configs', WH), {
+      wh_id: WH,
       capacity_rider: 350,
       capacity_driver: 800,
       capacity_op_inbound: 500,
@@ -102,18 +130,21 @@ beforeEach(async () => {
       ratio_rider: 0.7,
       ratio_driver: 0.3,
       rounding: 'ceil',
-      updated_by: 'seed',
+      updated_by: 'wipas-research:seed-config',
       updated_at: new Date(),
     });
-    await setDoc(doc(fs, 'decision_logs', 'd1'), decision('manajer', { decided_at: new Date() }));
-    await setDoc(doc(fs, 'config_history', 'h1'), { wh_id: WH, changed_by: 'uid-manajer', changed_at: new Date() });
-    await setDoc(doc(fs, 'notifications', `deviation_${WH}_20261009`), {
+    await setDoc(doc(fs, 'decision_logs', 'd1'), decision('manager', { decided_at: new Date() }));
+    await setDoc(doc(fs, 'operational_configs', WH, 'history', 'h1'), history('manager', { changed_at: new Date(), updated_at: new Date() }));
+    await setDoc(doc(fs, 'notifications', NOTIF), {
       type: 'deviation',
       title: 'Deviasi',
       body: 'x',
+      severity: 'warning',
       wh_id: WH,
+      target_date: '2026-10-09',
       created_at: new Date(),
-      audience_roles: ['admin', 'manajer', 'viewer'],
+      audience_roles: ['admin', 'manager', 'viewer'],
+      read_by: ['uid-admin'],
     });
     for (const c of ['daily_data', 'model_health', 'model_health_history', 'batch_logs', 'dataset_status', 'warehouses']) {
       await setDoc(doc(fs, c, WH), { wh_id: WH });
@@ -159,9 +190,32 @@ describe('predictions', () => {
       );
     });
   }
-  for (const role of ['manajer', 'viewer']) {
+  for (const role of ['manager', 'viewer']) {
     test(`${role} cannot update actual`, async () => {
       await assertFails(updateDoc(doc(db(role), 'predictions', PRED), actualUpdate(role)));
+    });
+  }
+  for (const role of ['admin', 'manager']) {
+    test(`${role} can set decision_* (approved)`, async () => {
+      await assertSucceeds(updateDoc(doc(db(role), 'predictions', PRED), decisionFields(role)));
+    });
+    test(`${role} can set decision_* (adjusted with note)`, async () => {
+      await assertSucceeds(updateDoc(doc(db(role), 'predictions', PRED),
+        decisionFields(role, { decision_status: 'adjusted', decision_note: 'antrean', decision_manpower: { ...MP, rider: 40 } })));
+    });
+    test(`${role} cannot adjust without note`, async () => {
+      await assertFails(updateDoc(doc(db(role), 'predictions', PRED), decisionFields(role, { decision_status: 'adjusted' })));
+    });
+    test(`${role} cannot decide on behalf of another user`, async () => {
+      await assertFails(updateDoc(doc(db(role), 'predictions', PRED), decisionFields(role, { decision_by: 'uid-other' })));
+    });
+    test(`${role} cannot mix decision_* with script fields`, async () => {
+      await assertFails(updateDoc(doc(db(role), 'predictions', PRED), { ...decisionFields(role), predicted: 1 }));
+    });
+  }
+  for (const role of ['supervisor', 'viewer']) {
+    test(`${role} cannot set decision_*`, async () => {
+      await assertFails(updateDoc(doc(db(role), 'predictions', PRED), decisionFields(role)));
     });
   }
 });
@@ -172,12 +226,15 @@ describe('operational_configs', () => {
       await assertSucceeds(getDoc(doc(db(role), 'operational_configs', WH)));
     });
   }
-  for (const role of ['admin', 'manajer']) {
+  for (const role of ['admin', 'manager']) {
     test(`${role} can update with valid values`, async () => {
       await assertSucceeds(updateDoc(doc(db(role), 'operational_configs', WH), validConfig(role)));
     });
     test(`${role} cannot set capacity <= 0`, async () => {
       await assertFails(updateDoc(doc(db(role), 'operational_configs', WH), { ...validConfig(role), capacity_rider: 0 }));
+    });
+    test(`${role} cannot change wh_id`, async () => {
+      await assertFails(updateDoc(doc(db(role), 'operational_configs', WH), { ...validConfig(role), wh_id: 'WH-X' }));
     });
     test(`${role} cannot set ratios not summing to 1.00`, async () => {
       await assertFails(updateDoc(doc(db(role), 'operational_configs', WH), { ...validConfig(role), ratio_rider: 0.75 }));
@@ -194,7 +251,7 @@ describe('operational_configs', () => {
 });
 
 describe('decision_logs (append-only)', () => {
-  for (const role of ['admin', 'manajer', 'supervisor']) {
+  for (const role of ['admin', 'manager', 'supervisor']) {
     test(`${role} can read`, async () => {
       await assertSucceeds(getDoc(doc(db(role), 'decision_logs', 'd1')));
     });
@@ -202,23 +259,23 @@ describe('decision_logs (append-only)', () => {
   test('viewer cannot read', async () => {
     await assertFails(getDoc(doc(db('viewer'), 'decision_logs', 'd1')));
   });
-  for (const role of ['admin', 'manajer']) {
+  for (const role of ['admin', 'manager']) {
     test(`${role} can create an approval`, async () => {
       await assertSucceeds(addDoc(collection(db(role), 'decision_logs'), decision(role)));
     });
     test(`${role} can create an adjustment with reason`, async () => {
       await assertSucceeds(
-        addDoc(collection(db(role), 'decision_logs'), decision(role, { decision: 'adjusted', reason: 'antrean' })),
+        addDoc(collection(db(role), 'decision_logs'), decision(role, { decision_status: 'adjusted', note: 'antrean' })),
       );
     });
     test(`${role} cannot create an adjustment without reason`, async () => {
-      await assertFails(addDoc(collection(db(role), 'decision_logs'), decision(role, { decision: 'adjusted', reason: '' })));
+      await assertFails(addDoc(collection(db(role), 'decision_logs'), decision(role, { decision_status: 'adjusted', note: '' })));
     });
     test(`${role} cannot log on behalf of another user`, async () => {
       await assertFails(addDoc(collection(db(role), 'decision_logs'), decision(role, { decided_by: 'uid-other' })));
     });
     test(`${role} cannot update or delete`, async () => {
-      await assertFails(updateDoc(doc(db(role), 'decision_logs', 'd1'), { reason: 'x' }));
+      await assertFails(updateDoc(doc(db(role), 'decision_logs', 'd1'), { note: 'x' }));
       await assertFails(deleteDoc(doc(db(role), 'decision_logs', 'd1')));
     });
   }
@@ -229,58 +286,75 @@ describe('decision_logs (append-only)', () => {
   }
 });
 
-describe('config_history (append-only)', () => {
-  for (const role of ['admin', 'manajer', 'supervisor']) {
+describe('operational_configs/{wh}/history (append-only)', () => {
+  const hist = (role, id = 'h1') => doc(db(role), 'operational_configs', WH, 'history', id);
+  for (const role of ['admin', 'manager', 'supervisor']) {
     test(`${role} can read`, async () => {
-      await assertSucceeds(getDoc(doc(db(role), 'config_history', 'h1')));
+      await assertSucceeds(getDoc(hist(role)));
     });
   }
   test('viewer cannot read', async () => {
-    await assertFails(getDoc(doc(db('viewer'), 'config_history', 'h1')));
+    await assertFails(getDoc(hist('viewer')));
   });
-  for (const role of ['admin', 'manajer']) {
+  for (const role of ['admin', 'manager']) {
     test(`${role} can create own entry`, async () => {
-      await assertSucceeds(
-        addDoc(collection(db(role), 'config_history'), { wh_id: WH, changed_by: `uid-${role}`, changed_at: serverTimestamp() }),
-      );
+      await assertSucceeds(setDoc(hist(role, 'new'), history(role)));
+    });
+    test(`${role} cannot create an entry for another user`, async () => {
+      await assertFails(setDoc(hist(role, 'new'), history(role, { changed_by: 'uid-other' })));
     });
     test(`${role} cannot update or delete`, async () => {
-      await assertFails(updateDoc(doc(db(role), 'config_history', 'h1'), { wh_id: 'x' }));
-      await assertFails(deleteDoc(doc(db(role), 'config_history', 'h1')));
+      await assertFails(updateDoc(hist(role), { note: 'x' }));
+      await assertFails(deleteDoc(hist(role)));
     });
   }
   for (const role of ['supervisor', 'viewer']) {
     test(`${role} cannot create`, async () => {
-      await assertFails(
-        addDoc(collection(db(role), 'config_history'), { wh_id: WH, changed_by: `uid-${role}`, changed_at: serverTimestamp() }),
-      );
+      await assertFails(setDoc(hist(role, 'new'), history(role)));
     });
   }
 });
 
 describe('notifications', () => {
-  for (const role of ['admin', 'manajer', 'viewer']) {
+  for (const role of ['admin', 'manager', 'viewer']) {
     test(`${role} (in audience) can read and query`, async () => {
-      await assertSucceeds(getDoc(doc(db(role), 'notifications', `deviation_${WH}_20261009`)));
+      await assertSucceeds(getDoc(doc(db(role), 'notifications', NOTIF)));
       await assertSucceeds(
         getDocs(query(collection(db(role), 'notifications'), where('audience_roles', 'array-contains', role))),
       );
     });
   }
   test('supervisor (not in audience) cannot read', async () => {
-    await assertFails(getDoc(doc(db('supervisor'), 'notifications', `deviation_${WH}_20261009`)));
+    await assertFails(getDoc(doc(db('supervisor'), 'notifications', NOTIF)));
   });
   test('query without role filter is rejected', async () => {
     await assertFails(getDocs(collection(db('admin'), 'notifications')));
   });
   for (const role of ROLES) {
-    test(`${role} cannot write`, async () => {
+    test(`${role} cannot create notifications`, async () => {
       await assertFails(setDoc(doc(db(role), 'notifications', 'n2'), { audience_roles: [role] }));
     });
   }
+  for (const role of ['manager', 'viewer']) {
+    test(`${role} (in audience) can add own uid to read_by`, async () => {
+      await assertSucceeds(updateDoc(doc(db(role), 'notifications', NOTIF), { read_by: arrayUnion(`uid-${role}`) }));
+    });
+    test(`${role} cannot add another uid to read_by`, async () => {
+      await assertFails(updateDoc(doc(db(role), 'notifications', NOTIF), { read_by: arrayUnion('uid-other') }));
+    });
+    test(`${role} cannot change other notification fields`, async () => {
+      await assertFails(updateDoc(doc(db(role), 'notifications', NOTIF), { title: 'x' }));
+    });
+  }
+  test('removing a uid from read_by is rejected', async () => {
+    await assertFails(updateDoc(doc(db('admin'), 'notifications', NOTIF), { read_by: [] }));
+  });
+  test('supervisor (not in audience) cannot mark as read', async () => {
+    await assertFails(updateDoc(doc(db('supervisor'), 'notifications', NOTIF), { read_by: arrayUnion('uid-supervisor') }));
+  });
 });
 
-describe('users & notification_reads', () => {
+describe('users', () => {
   for (const role of ROLES) {
     test(`${role} can read own profile but not others`, async () => {
       await assertSucceeds(getDoc(doc(db(role), 'users', `uid-${role}`)));
@@ -289,13 +363,6 @@ describe('users & notification_reads', () => {
     });
     test(`${role} cannot change own role`, async () => {
       await assertFails(updateDoc(doc(db(role), 'users', `uid-${role}`), { role: 'admin' }));
-    });
-    test(`${role} can mark own notification as read`, async () => {
-      await assertSucceeds(setDoc(doc(db(role), 'users', `uid-${role}`, 'notification_reads', 'n1'), { read_at: serverTimestamp() }));
-    });
-    test(`${role} cannot write another user's reads`, async () => {
-      const other = ROLES.find((r) => r !== role);
-      await assertFails(setDoc(doc(db(role), 'users', `uid-${other}`, 'notification_reads', 'n1'), { read_at: serverTimestamp() }));
     });
   }
 });

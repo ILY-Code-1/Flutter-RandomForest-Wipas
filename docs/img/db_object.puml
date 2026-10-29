@@ -4,89 +4,100 @@ skinparam shadowing false
 left to right direction
 object "warehouses/WH-CKG-01" as w {
   name = "Hub Cakung"
-  city = "Jakarta Timur"
+  code = "WH-CKG-01"
+  timezone = "Asia/Jakarta"
 }
 object "users/uid-manajer" as u {
-  display_name = "Budi Santoso"
-  role = "manajer"
-  wh_id = "WH-CKG-01"
-  job_title = "Manajer Warehouse"
-}
-object "notification_reads/deviation_WH-CKG-01_20261004" as nr {
-  read_at = 2026-10-03T16:02Z
+  name = "Budi Santoso"
+  role = "manager"
 }
 object "daily_data/WH-CKG-01_20261008" as d {
   date = "2026-10-08"
+  campaign = 0
+  payday = 0
   projection_inbound = 16200
   actual_inbound = 17560
-  backlog_h1 = 512
+  actual_source = "app"
 }
 object "predictions/pred_WH-CKG-01_20261009" as p {
   target_date = "2026-10-09"
   predicted = 18420
   projection = 15900
-  deviation_pct = 15.8
+  deviation_pct = 15.85
   alert = true
+  status = "Perlu Perhatian"
   data_status = "complete"
-  manpower = {rider: 37, driver: 7, op_inbound: 37, op_outbound: 31}
+  input_features = {hari: 4, bulan: 10, actual_h1: 17560, …}
+  manpower = {rider: 37, driver: 7, op_inbound: 37, op_outbound: 31, config_snapshot: {…}}
   actual_inbound = null
+  decision_status = "approved"
+  decision_by = "uid-manajer"
 }
 object "operational_configs/WH-CKG-01" as c {
+  wh_id = "WH-CKG-01"
   capacity_rider = 350
   capacity_driver = 800
   ratio_rider = 0.7
   ratio_driver = 0.3
   updated_by = "uid-manajer"
 }
-object "config_history/seed_1" as h {
+object "operational_configs/WH-CKG-01/history/seed_1" as h {
+  capacity_op_outbound = 600
   changed_by = "uid-manajer"
-  old_values = {capacity_op_outbound: 580}
-  new_values = {capacity_op_outbound: 600}
+  note = "Capacity_Op_Outbound: 580 → 600"
 }
 object "decision_logs/Rz8TnB4cWq" as dl {
-  pred_id = "pred_WH-CKG-01_20261009"
+  prediction_id = "pred_WH-CKG-01_20261009"
+  decision_status = "approved"
+  final = {rider: 37, driver: 7, op_inbound: 37, op_outbound: 31}
+  note = null
   decided_by = "uid-manajer"
-  decision = "approved"
-  reason = null
 }
 object "model_health/WH-CKG-01" as mh {
   status = "healthy"
   rolling_mae_7d = 6.8
+  n_points = 7
   baseline_mae = 6.2
   drift_threshold = 7.13
+  drift_factor = 1.15
 }
 object "model_health_history/WH-CKG-01_20261008" as mhh {
   date = "2026-10-08"
   rolling_mae_7d = 6.8
+  n_points = 7
 }
-object "batch_logs/WH-CKG-01_20261008" as b {
+object "batch_logs/WH-CKG-01_20261009" as b {
+  target_date = "2026-10-09"
   status = "success"
-  duration_sec = 134
-  retry_count = 0
+  duration_s = 134.0
+  retries = 0
   source = "H-1"
 }
 object "dataset_status/WH-CKG-01" as ds {
   range_start = "2025-01-01"
-  range_end = "2026-10-08"
-  row_count = 646
+  range_end = "2026-10-09"
+  row_count = 647
+  labeled_count = 646
 }
 object "notifications/deviation_WH-CKG-01_20261009" as n {
   type = "deviation"
-  audience_roles = [admin, manajer, supervisor, viewer]
+  severity = "warning"
+  audience_roles = [admin, manager, supervisor]
+  read_by = ["uid-admin"]
 }
-u --> w : wh_id
 p --> w : wh_id
 d --> w : wh_id
-c --> w : id = wh
+c --> w : wh_id
+c --> h : sub-koleksi history
 c --> u : updated_by
 h --> u : changed_by
-dl --> p : pred_id
+dl --> p : prediction_id
 dl --> u : decided_by
-mh --> w : id = wh
+p --> u : decision_by
+mh --> w : id = wh_id
 mhh --> w : wh_id
 b --> w : wh_id
-ds --> w : id = wh
+ds --> w : id = wh_id
 n --> w : wh_id
-u --> nr : sub-koleksi
-nr --> n : id = notifId
+n --> u : read_by[]
 @enduml

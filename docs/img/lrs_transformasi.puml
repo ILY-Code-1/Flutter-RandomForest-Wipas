@@ -8,37 +8,36 @@ left to right direction
 class Warehouse <<Table>> {
   + wh_id : VARCHAR
   - name : VARCHAR
-  - city : VARCHAR
+  - timezone : VARCHAR
+  - created_at : TIMESTAMP
 }
 class AppUser <<Table>> {
   + uid : VARCHAR
-  # wh_id : VARCHAR
-  - display_name : VARCHAR
-  - email : VARCHAR
+  - name : VARCHAR
   - role : VARCHAR
-  - job_title : VARCHAR
 }
 class DailyData <<Table>> {
   + daily_id : VARCHAR
   # wh_id : VARCHAR
   - date : DATE
-  - day_of_week : SMALLINT
-  - month : SMALLINT
-  - is_campaign : BOOLEAN
-  - is_holiday : BOOLEAN
-  - is_payday : BOOLEAN
+  - campaign : SMALLINT
+  - hari_libur : SMALLINT
+  - payday : SMALLINT
   - pickup_request_h1 : INTEGER
   - projection_inbound : INTEGER
   - backlog_h1 : INTEGER
-  - actual_inbound_h2 : INTEGER
-  - actual_inbound_h1 : INTEGER
   - actual_inbound : INTEGER
+  - actual_source : VARCHAR
+  - actual_synced_at : TIMESTAMP
+  - row_hash : CHAR
   - source_file : VARCHAR
+  - imported_at : TIMESTAMP
 }
 class Prediction <<Table>> {
   + pred_id : VARCHAR
   # wh_id : VARCHAR
   # actual_input_by : VARCHAR
+  # decision_by : VARCHAR
   - target_date : DATE
   - predicted : INTEGER
   - projection : INTEGER
@@ -49,22 +48,36 @@ class Prediction <<Table>> {
   - source : VARCHAR
   - model_version : VARCHAR
   - generated_at : TIMESTAMP
-  - feat_day_of_week : SMALLINT
-  - feat_month : SMALLINT
-  - feat_is_campaign : BOOLEAN
-  - feat_is_holiday : BOOLEAN
-  - feat_is_payday : BOOLEAN
+  - feat_hari : SMALLINT
+  - feat_bulan : SMALLINT
+  - feat_campaign : SMALLINT
+  - feat_hari_libur : SMALLINT
+  - feat_payday : SMALLINT
   - feat_pickup_request_h1 : INTEGER
   - feat_projection_inbound : INTEGER
   - feat_backlog_h1 : INTEGER
-  - feat_actual_inbound_h2 : INTEGER
-  - feat_actual_inbound_h1 : INTEGER
+  - feat_actual_h2 : INTEGER
+  - feat_actual_h1 : INTEGER
   - is_backfill : BOOLEAN
+  - is_dummy_data : BOOLEAN
+  - evaluated : BOOLEAN
+  - daily_error_pct : DECIMAL
+  - evaluated_at : TIMESTAMP
   - actual_inbound : INTEGER
   - actual_note : VARCHAR
   - actual_input_at : TIMESTAMP
-  - daily_error_pct : DECIMAL
-  - evaluated : BOOLEAN
+  - decision_status : VARCHAR
+  - decision_at : TIMESTAMP
+  - decision_note : VARCHAR
+  - decision_rider : INTEGER
+  - decision_driver : INTEGER
+  - decision_op_inbound : INTEGER
+  - decision_op_outbound : INTEGER
+}
+class PredictionNote <<Table>> {
+  + pred_id : VARCHAR {FK}
+  + seq : SMALLINT
+  - note : VARCHAR
 }
 class ManpowerRecommendation <<Table>> {
   + pred_id : VARCHAR {FK}
@@ -78,6 +91,8 @@ class ManpowerRecommendation <<Table>> {
   - snap_capacity_op_outbound : DECIMAL
   - snap_ratio_rider : DECIMAL
   - snap_ratio_driver : DECIMAL
+  - snap_rounding : VARCHAR
+  - snap_source : VARCHAR
 }
 class PredictionFeatureImportance <<Table>> {
   + pred_id : VARCHAR {FK}
@@ -86,7 +101,6 @@ class PredictionFeatureImportance <<Table>> {
 }
 class OperationalConfig <<Table>> {
   + wh_id : VARCHAR {FK}
-  # updated_by : VARCHAR
   - capacity_rider : DECIMAL
   - capacity_driver : DECIMAL
   - capacity_op_inbound : DECIMAL
@@ -94,6 +108,7 @@ class OperationalConfig <<Table>> {
   - ratio_rider : DECIMAL
   - ratio_driver : DECIMAL
   - rounding : VARCHAR
+  - updated_by : VARCHAR
   - updated_at : TIMESTAMP
 }
 class ConfigHistory <<Table>> {
@@ -102,37 +117,52 @@ class ConfigHistory <<Table>> {
   # changed_by : VARCHAR
   - changed_by_name : VARCHAR
   - changed_at : TIMESTAMP
-}
-class ConfigHistoryDetail <<Table>> {
-  + history_id : VARCHAR {FK}
-  + field_name : VARCHAR
-  - old_value : DECIMAL
-  - new_value : DECIMAL
+  - note : VARCHAR
+  - capacity_rider : DECIMAL
+  - capacity_driver : DECIMAL
+  - capacity_op_inbound : DECIMAL
+  - capacity_op_outbound : DECIMAL
+  - ratio_rider : DECIMAL
+  - ratio_driver : DECIMAL
+  - rounding : VARCHAR
 }
 class DecisionLog <<Table>> {
   + decision_id : VARCHAR
-  # pred_id : VARCHAR
+  # prediction_id : VARCHAR
   # wh_id : VARCHAR
   # decided_by : VARCHAR
   - decided_by_name : VARCHAR
-  - decision : VARCHAR
-  - rider_final : INTEGER
-  - driver_final : INTEGER
-  - op_inbound_final : INTEGER
-  - op_outbound_final : INTEGER
-  - reason : VARCHAR
+  - target_date : DATE
+  - decision_status : VARCHAR
+  - recommended_rider : INTEGER
+  - recommended_driver : INTEGER
+  - recommended_op_inbound : INTEGER
+  - recommended_op_outbound : INTEGER
+  - final_rider : INTEGER
+  - final_driver : INTEGER
+  - final_op_inbound : INTEGER
+  - final_op_outbound : INTEGER
+  - note : VARCHAR
   - decided_at : TIMESTAMP
 }
 class ModelHealth <<Table>> {
   + wh_id : VARCHAR {FK}
   - status : VARCHAR
   - rolling_mae_7d : DECIMAL
+  - rolling_window_days : SMALLINT
+  - n_points : SMALLINT
+  - last_evaluated_date : DATE
   - baseline_mae : DECIMAL
   - drift_threshold : DECIMAL
+  - drift_factor : DECIMAL
   - model_version : VARCHAR
   - mae_validation : DECIMAL
+  - mae_validation_paket : DECIMAL
   - rmse : DECIMAL
+  - rmse_paket : DECIMAL
   - r2 : DECIMAL
+  - trained_at : TIMESTAMP
+  - is_dummy_data : BOOLEAN
   - updated_at : TIMESTAMP
 }
 class ModelHealthHistory <<Table>> {
@@ -140,22 +170,33 @@ class ModelHealthHistory <<Table>> {
   # wh_id : VARCHAR
   - date : DATE
   - rolling_mae_7d : DECIMAL
+  - status : VARCHAR
   - baseline_mae : DECIMAL
   - drift_threshold : DECIMAL
-  - status : VARCHAR
+  - n_points : SMALLINT
+  - model_version : VARCHAR
+  - updated_at : TIMESTAMP
 }
 class BatchLog <<Table>> {
   + batch_id : VARCHAR
   # wh_id : VARCHAR
-  - run_date : DATE
   - target_date : DATE
   - started_at : TIMESTAMP
   - finished_at : TIMESTAMP
-  - duration_sec : INTEGER
+  - duration_s : DECIMAL
   - status : VARCHAR
-  - retry_count : SMALLINT
-  - source : VARCHAR
   - message : VARCHAR
+  - retries : SMALLINT
+  - source : VARCHAR
+  - data_status : VARCHAR
+  - model_version : VARCHAR
+  - predicted : INTEGER
+  - error : VARCHAR
+  - dry_run : BOOLEAN
+}
+class BatchEvaluatedDate <<Table>> {
+  + batch_id : VARCHAR {FK}
+  + evaluated_date : DATE
 }
 class DatasetStatus <<Table>> {
   + wh_id : VARCHAR {FK}
@@ -163,16 +204,30 @@ class DatasetStatus <<Table>> {
   - range_start : DATE
   - range_end : DATE
   - row_count : INTEGER
+  - labeled_count : INTEGER
+  - last_actual_date : DATE
   - source_file : VARCHAR
+  - is_dummy_data : BOOLEAN
+  - last_import_written_rows : INTEGER
+  - last_batch_at : TIMESTAMP
+  - last_batch_status : VARCHAR
+  - last_batch_target_date : DATE
 }
 class Notification <<Table>> {
   + notif_id : VARCHAR
   # wh_id : VARCHAR
+  # batch_log_id : VARCHAR
   - type : VARCHAR
   - title : VARCHAR
   - body : VARCHAR
+  - severity : VARCHAR
   - target_date : DATE
   - created_at : TIMESTAMP
+  - updated_at : TIMESTAMP
+  - batch_status : VARCHAR
+  - deviation_pct : DECIMAL
+  - rolling_mae_7d : DECIMAL
+  - drift_threshold : DECIMAL
 }
 class NotificationAudience <<Table>> {
   + notif_id : VARCHAR {FK}
@@ -181,9 +236,7 @@ class NotificationAudience <<Table>> {
 class NotificationRead <<Table>> {
   + uid : VARCHAR {FK}
   + notif_id : VARCHAR {FK}
-  - read_at : TIMESTAMP
 }
-Warehouse "1" --> "N" AppUser : menaungi
 Warehouse "1" --> "N" DailyData : mencatat
 Warehouse "1" --> "N" Prediction : memiliki
 Warehouse "1" --> "1" OperationalConfig : diatur oleh
@@ -196,12 +249,13 @@ Warehouse "1" --> "N" ConfigHistory : mengaudit
 Warehouse "1" --> "N" DecisionLog : mencatat keputusan
 Prediction "1" --> "0..1" ManpowerRecommendation : menghasilkan
 Prediction "1" --> "N" PredictionFeatureImportance : dijelaskan oleh
+Prediction "1" --> "N" PredictionNote : diberi catatan
 Prediction "1" --> "N" DecisionLog : diputuskan melalui
 AppUser "1" --> "N" DecisionLog : membuat
-AppUser "0..1" --> "N" Prediction : menginput actual
-AppUser "1" --> "N" OperationalConfig : memperbarui
+AppUser "0..1" --> "N" Prediction : menginput actual / memutuskan
 AppUser "1" --> "N" ConfigHistory : mengubah
-ConfigHistory "1" --> "N" ConfigHistoryDetail : terdiri atas
+BatchLog "1" --> "N" BatchEvaluatedDate : mengevaluasi
+BatchLog "0..1" --> "N" Notification : dilaporkan dalam
 Notification "1" --> "N" NotificationAudience : ditujukan ke
 AppUser "1" --> "N" NotificationRead : membaca
 Notification "1" --> "N" NotificationRead : dibaca dalam
@@ -209,20 +263,24 @@ note bottom of ManpowerRecommendation
   1:1 embed manpower → tabel terpisah,
   PK = FK pred_id
 end note
+note bottom of PredictionNote
+  array notes → tabel,
+  PK (pred_id, seq)
+end note
+note bottom of BatchEvaluatedDate
+  array evaluated_dates → tabel,
+  PK (batch_id, evaluated_date)
+end note
 note bottom of PredictionFeatureImportance
   atribut multinilai feature_importance
   → tabel, PK komposit
-end note
-note bottom of ConfigHistoryDetail
-  weak entity: map old/new_values
-  → PK (history_id, field_name)
 end note
 note bottom of NotificationAudience
   array audience_roles → tabel,
   PK (notif_id, role)
 end note
 note bottom of NotificationRead
-  M:N AppUser–Notification
+  array read_by (M:N AppUser–Notification)
   → tabel junction
 end note
 @enduml

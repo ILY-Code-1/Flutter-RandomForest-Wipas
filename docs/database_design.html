@@ -16,33 +16,33 @@ img.diagram{max-width:100%;border:1px solid #DDE3EC;border-radius:8px;margin:8px
 @media print{pre.plantuml{white-space:pre-wrap;color:#000;background:#fff;border:1px solid #999}h2{page-break-after:avoid}table{page-break-inside:auto}}
 </style></head>
 <body><h1>Desain Basis Data WIPAS (Firestore) — v1</h1><p class="sub">Model dokumen NoSQL yang benar-benar dipakai aplikasi wipas-app.</p>
-<div class="note">Implementasi aktual WIPAS memakai <b>Cloud Firestore (NoSQL)</b> pada paket Spark. Script <code>wipas-research</code> menulis koleksi hasil batch dengan Admin SDK; aplikasi hanya menulis <code>actual_*</code>, <code>decision_logs</code>, <code>operational_configs</code> + <code>config_history</code>, dan <code>notification_reads</code>, dibatasi oleh <code>firebase/firestore.rules</code>.</div>
+<div class="note">Implementasi aktual WIPAS memakai <b>Cloud Firestore (NoSQL)</b> pada paket Spark, mengikuti kontrak <code>docs/firestore_schema.md</code> v1.0 dari repo <code>wipas-research</code>. Script menulis koleksi hasil batch dengan Admin SDK; aplikasi hanya menulis field milik App: <code>predictions.actual_*</code>, <code>predictions.decision_*</code>, <code>decision_logs</code>, <code>operational_configs</code> + <code>/history</code>, dan <code>notifications.read_by</code>, dibatasi oleh <code>firebase/firestore.rules</code>.</div>
 <h2>1. Model NoSQL: embedding vs referencing</h2>
 <table><tr><th>Keputusan</th><th>Strategi</th><th>Alasan (terkait fitur WIPAS)</th><th>Contoh nyata</th></tr>
 <tr><td>Fitur prediktor & rekomendasi manpower</td><td><b>Embed</b> di <code>predictions</code></td><td>Selalu dibaca bersama prediksi (Beranda, Prediksi, Manpower); satu dokumen = satu baca, hemat kuota 50.000 baca/hari. <code>config_snapshot</code> membekukan kapasitas saat dihitung sehingga "Cara hitung" konsisten walau konfigurasi berubah.</td><td><code>predictions/pred_WH-CKG-01_20261009.manpower = {rider: 37, driver: 7, op_inbound: 37, op_outbound: 31, config_snapshot: {...}}</code></td></tr>
-<tr><td>Feature importance</td><td><b>Embed</b> (map) di <code>predictions</code> dan <code>model_health</code></td><td>Ukuran tetap (10 fitur), dibaca utuh untuk "Faktor pendorong".</td><td><code>feature_importance.actual_inbound_h1 = 0.27</code></td></tr>
-<tr><td>Keputusan manpower</td><td><b>Referensi</b> lewat <code>pred_id</code> (koleksi terpisah)</td><td>Append-only dan ditulis aplikasi, sedangkan prediksi ditulis script: dipisah agar rules bisa melarang update/delete log dan prediksi tidak perlu diubah klien. Viewer ditolak membaca log.</td><td><code>decision_logs/{auto}.pred_id = "pred_WH-CKG-01_20261009"</code></td></tr>
-<tr><td>Riwayat konfigurasi</td><td><b>Referensi</b> + transaksi</td><td>Audit trail tak terbatas; ditulis bersama <code>operational_configs</code> dalam satu transaksi.</td><td><code>config_history/{auto}</code></td></tr>
-<tr><td>Status baca notifikasi</td><td><b>Sub-koleksi</b> <code>users/{uid}/notification_reads</code></td><td>Per pengguna, ditulis pemilik saja; notifikasi sendiri dibagikan ke banyak role lewat <code>audience_roles</code>.</td><td><code>users/uid-admin/notification_reads/deviation_WH-CKG-01_20261009</code></td></tr>
-<tr><td>Nama pembuat log</td><td><b>Denormalisasi</b> <code>*_by_name</code></td><td>Rules hanya mengizinkan membaca profil sendiri; nama disalin saat menulis.</td><td><code>decided_by_name = "Budi Santoso"</code></td></tr>
-<tr><td>ID dokumen</td><td><b>Deterministik</b> <code>pred_{wh}_{YYYYMMDD}</code>, <code>{type}_{wh}_{YYYYMMDD}</code></td><td>Batch idempoten: menjalankan ulang script menimpa dokumen yang sama, tidak menggandakan.</td><td><code>pred_WH-CKG-01_20261009</code></td></tr>
+<tr><td>Feature importance & catatan script</td><td><b>Embed</b> (map / array) di <code>predictions</code> dan <code>model_health</code></td><td>Ukuran kecil dan dibaca utuh ("Faktor pendorong", catatan fallback).</td><td><code>feature_importance.actual_h1 = 0.27</code>, <code>notes = ["Fallback H-2 …"]</code></td></tr>
+<tr><td>Status keputusan terkini</td><td><b>Embed</b> field App <code>decision_*</code> di <code>predictions</code></td><td>Beranda, Manpower, dan Riwayat cukup membaca prediksi (tanpa query log tambahan); Viewer tetap dapat membaca prediksi tetapi UI menyembunyikan keputusan.</td><td><code>decision_status = "adjusted"</code>, <code>decision_manpower = {rider: 40, …}</code></td></tr>
+<tr><td>Riwayat keputusan</td><td><b>Referensi</b> lewat <code>prediction_id</code> (koleksi <code>decision_logs</code>)</td><td>Append-only milik App; rules melarang update/delete dan menolak Viewer. Ditulis dalam satu batch bersama <code>decision_*</code>.</td><td><code>decision_logs/{auto}.prediction_id = "pred_WH-CKG-01_20261009"</code></td></tr>
+<tr><td>Riwayat konfigurasi</td><td><b>Sub-koleksi</b> <code>operational_configs/{wh_id}/history</code> + transaksi</td><td>Salinan konfigurasi sesudah perubahan + <code>changed_by</code>, <code>changed_at</code>, <code>note</code>; Python tidak membaca/menulisnya.</td><td><code>operational_configs/WH-CKG-01/history/{auto}</code></td></tr>
+<tr><td>Status baca notifikasi</td><td><b>Array</b> <code>read_by</code> di dokumen notifikasi (<code>arrayUnion</code>)</td><td>Satu baca per notifikasi tanpa koleksi tambahan; rules hanya mengizinkan penerima menambahkan uid sendiri.</td><td><code>read_by = ["uid-admin"]</code></td></tr>
+<tr><td>Nama pembuat log</td><td><b>Denormalisasi</b> <code>*_by_name</code> (ekstensi App)</td><td>Rules hanya mengizinkan membaca profil sendiri; nama disalin saat menulis.</td><td><code>decided_by_name = "Budi Santoso"</code></td></tr>
+<tr><td>ID dokumen</td><td><b>Deterministik</b> <code>pred_{wh_id}_{YYYYMMDD}</code>, <code>{type}_{wh_id}_{YYYYMMDD}</code>, <code>{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Batch idempoten (<code>set(merge=True)</code>): menjalankan ulang script tidak menggandakan dokumen.</td><td><code>pred_WH-CKG-01_20261009</code></td></tr>
 <tr><td>Hindari collection group besar</td><td>Koleksi top-level per jenis + query <code>wh_id</code> + rentang tanggal + <code>limit</code></td><td>Kuota Spark; setiap query dibatasi (≤ 31 prediksi, 30 notifikasi, 60 keputusan).</td><td><code>where wh_id == … where target_date ≥ … limit 31</code></td></tr>
 </table>
 <h2>2. Struktur koleksi</h2><ul class='tree'><li><b>(root)</b><ul>
-<li><b>users/{uid}</b> — Profil &amp; role pengguna; dibuat manual (Console/seed). Penulis: Console. Contoh ID <code>uid-admin-7Hq2</code><ul><li><code>display_name</code> : string</li><li><code>email</code> : string</li><li><code>role</code> : string</li><li><code>wh_id</code> : string</li><li><code>job_title</code> : string|null</li><li><b>notification_reads/{notifId}</b> — Status baca notifikasi per pengguna. contoh <code>deviation_WH-CKG-01_20261009</code><ul><li><code>read_at</code> : timestamp</li><li>→ referensi <code>notifications/{notifId}</code></li></ul></li></ul></li>
-<li><b>warehouses/{wh}</b> — Master gudang. Penulis: Console. Contoh ID <code>WH-CKG-01</code><ul><li><code>name</code> : string</li><li><code>city</code> : string</li></ul></li>
-<li><b>daily_data/{wh}_{YYYYMMDD}</b> — Baris Excel yang diimpor script (fitur + actual). Penulis: Script. Contoh ID <code>WH-CKG-01_20261008</code><ul><li><code>wh_id</code> : string</li><li><code>date</code> : string YYYY-MM-DD</li><li><code>day_of_week</code> : int</li><li><code>month</code> : int</li><li><code>is_campaign</code> : bool</li><li><code>is_holiday</code> : bool</li><li><code>is_payday</code> : bool</li><li><code>pickup_request_h1</code> : int|null</li><li><code>projection_inbound</code> : int</li><li><code>backlog_h1</code> : int|null</li><li><code>actual_inbound_h2</code> : int|null</li><li><code>actual_inbound_h1</code> : int|null</li><li><code>actual_inbound</code> : int|null</li><li><code>source_file</code> : string</li></ul></li>
-<li><b>predictions/pred_{wh}_{YYYYMMDD}</b> — Hasil batch prediksi H+1 (idempoten per tanggal). Penulis: Script + Aplikasi (actual_*). Contoh ID <code>pred_WH-CKG-01_20261009</code><ul><li><code>wh_id</code> : string</li><li><code>target_date</code> : string YYYY-MM-DD</li><li><code>predicted</code> : int</li><li><code>projection</code> : int</li><li><code>deviation_pct</code> : double</li><li><code>alert</code> : bool</li><li><code>status</code> : string</li><li><code>data_status</code> : string</li><li><code>source</code> : string</li><li><code>model_version</code> : string</li><li><code>generated_at</code> : timestamp</li><li><code>input_features</code> : map (10 fitur)</li><li><code>feature_importance</code> : map&lt;string,double&gt;</li><li><code>manpower</code> : map</li><li><code>is_backfill</code> : bool</li><li><code>actual_inbound</code> : int|null</li><li><code>actual_note</code> : string|null</li><li><code>actual_input_by</code> : string (uid)</li><li><code>actual_input_at</code> : timestamp</li><li><code>daily_error_pct</code> : double|null</li><li><code>evaluated</code> : bool</li></ul></li>
-<li><b>operational_configs/{wh}</b> — Kapasitas &amp; rasio manpower aktif. Penulis: Aplikasi (admin, manajer). Contoh ID <code>WH-CKG-01</code><ul><li><code>capacity_rider</code> : number</li><li><code>capacity_driver</code> : number</li><li><code>capacity_op_inbound</code> : number</li><li><code>capacity_op_outbound</code> : number</li><li><code>ratio_rider</code> : number</li><li><code>ratio_driver</code> : number</li><li><code>rounding</code> : string</li><li><code>updated_by</code> : string (uid)</li><li><code>updated_at</code> : timestamp</li></ul></li>
-<li><b>config_history/{auto}</b> — Audit trail perubahan konfigurasi (append-only). Penulis: Aplikasi (admin, manajer). Contoh ID <code>Xk2pQ9aLm3</code><ul><li><code>wh_id</code> : string</li><li><code>changed_by</code> : string (uid)</li><li><code>changed_by_name</code> : string</li><li><code>changed_at</code> : timestamp</li><li><code>old_values</code> : map&lt;string,number&gt;</li><li><code>new_values</code> : map&lt;string,number&gt;</li></ul></li>
-<li><b>decision_logs/{auto}</b> — Keputusan manpower (append-only). Penulis: Aplikasi (admin, manajer). Contoh ID <code>Rz8TnB4cWq</code><ul><li><code>pred_id</code> : string</li><li><code>wh_id</code> : string</li><li><code>decided_by</code> : string (uid)</li><li><code>decided_by_name</code> : string</li><li><code>decision</code> : string</li><li><code>manpower_final</code> : map</li><li><code>reason</code> : string|null</li><li><code>decided_at</code> : timestamp</li></ul></li>
-<li><b>model_health/{wh}</b> — Kesehatan model terkini (dihitung script). Penulis: Script. Contoh ID <code>WH-CKG-01</code><ul><li><code>status</code> : string</li><li><code>rolling_mae_7d</code> : double</li><li><code>baseline_mae</code> : double</li><li><code>drift_threshold</code> : double</li><li><code>model_version</code> : string</li><li><code>mae_validation</code> : double</li><li><code>rmse</code> : double</li><li><code>r2</code> : double</li><li><code>feature_importance</code> : map&lt;string,double&gt;</li><li><code>updated_at</code> : timestamp</li></ul></li>
-<li><b>model_health_history/{wh}_{YYYYMMDD}</b> — Riwayat Rolling MAE harian. Penulis: Script. Contoh ID <code>WH-CKG-01_20261008</code><ul><li><code>wh_id</code> : string</li><li><code>date</code> : string YYYY-MM-DD</li><li><code>rolling_mae_7d</code> : double</li><li><code>baseline_mae</code> : double</li><li><code>drift_threshold</code> : double</li><li><code>status</code> : string</li></ul></li>
-<li><b>batch_logs/{wh}_{YYYYMMDD}</b> — Log eksekusi batch harian. Penulis: Script. Contoh ID <code>WH-CKG-01_20261008</code><ul><li><code>wh_id</code> : string</li><li><code>run_date</code> : string YYYY-MM-DD</li><li><code>target_date</code> : string YYYY-MM-DD</li><li><code>started_at</code> : timestamp</li><li><code>finished_at</code> : timestamp</li><li><code>duration_sec</code> : int</li><li><code>status</code> : string</li><li><code>retry_count</code> : int</li><li><code>source</code> : string</li><li><code>message</code> : string|null</li></ul></li>
-<li><b>dataset_status/{wh}</b> — Ringkasan dataset hasil impor. Penulis: Script. Contoh ID <code>WH-CKG-01</code><ul><li><code>wh_id</code> : string</li><li><code>last_import_at</code> : timestamp</li><li><code>range_start</code> : string YYYY-MM-DD</li><li><code>range_end</code> : string YYYY-MM-DD</li><li><code>row_count</code> : int</li><li><code>source_file</code> : string</li></ul></li>
-<li><b>notifications/{type}_{wh}_{YYYYMMDD}</b> — Notifikasi dalam aplikasi. Penulis: Script. Contoh ID <code>deviation_WH-CKG-01_20261009</code><ul><li><code>type</code> : string</li><li><code>title</code> : string</li><li><code>body</code> : string</li><li><code>wh_id</code> : string</li><li><code>target_date</code> : string YYYY-MM-DD</li><li><code>created_at</code> : timestamp</li><li><code>audience_roles</code> : array&lt;string&gt;</li></ul></li>
+<li><b>warehouses/{wh_id}</b> — Identitas gudang. Penulis: Python (seed-config). Contoh ID <code>WH-CKG-01</code><ul><li><code>name</code> : string</li><li><code>code</code> : string</li><li><code>timezone</code> : string</li><li><code>created_at</code> : timestamp</li></ul></li>
+<li><b>users/{uid}</b> — Profil &amp; peran; dibuat lewat Firebase Console. Penulis: App / Console. Contoh ID <code>uid-manajer</code><ul><li><code>role</code> : string</li><li><code>name</code> : string</li></ul></li>
+<li><b>daily_data/{wh_id}_{YYYYMMDD}</b> — Fitur Excel + actual per hari. Penulis: Python (import-data, evaluate). Contoh ID <code>WH-CKG-01_20261008</code><ul><li><code>wh_id</code> : string</li><li><code>date</code> : string YYYY-MM-DD</li><li><code>campaign</code> : int 0/1</li><li><code>hari_libur</code> : int 0/1</li><li><code>payday</code> : int 0/1</li><li><code>pickup_request_h1</code> : int</li><li><code>projection_inbound</code> : int</li><li><code>backlog_h1</code> : int</li><li><code>actual_inbound</code> : int|null</li><li><code>actual_source</code> : string</li><li><code>actual_synced_at</code> : timestamp</li><li><code>row_hash</code> : string</li><li><code>source_file</code> : string</li><li><code>imported_at</code> : timestamp</li></ul></li>
+<li><b>predictions/pred_{wh_id}_{YYYYMMDD}</b> — Prediksi H+1, deviasi, manpower (ID deterministik → idempoten). Penulis: Python + App (actual_*, decision_*). Contoh ID <code>pred_WH-CKG-01_20261009</code><ul><li><code>wh_id</code> : string</li><li><code>target_date</code> : string YYYY-MM-DD</li><li><code>predicted</code> : int</li><li><code>projection</code> : int|null</li><li><code>deviation_pct</code> : number|null</li><li><code>alert</code> : bool</li><li><code>status</code> : string</li><li><code>data_status</code> : string</li><li><code>source</code> : string</li><li><code>model_version</code> : string</li><li><code>generated_at</code> : timestamp</li><li><code>input_features</code> : map&lt;string,number&gt;</li><li><code>feature_importance</code> : map&lt;string,number&gt;</li><li><code>manpower</code> : map</li><li><code>is_backfill</code> : bool</li><li><code>is_dummy_data</code> : bool</li><li><code>notes</code> : array&lt;string&gt;</li><li><code>evaluated</code> : bool</li><li><code>daily_error_pct</code> : number|null</li><li><code>evaluated_at</code> : timestamp</li><li><code>actual_inbound</code> : int</li><li><code>actual_note</code> : string</li><li><code>actual_input_by</code> : string</li><li><code>actual_input_at</code> : timestamp</li><li><code>decision_status</code> : string</li><li><code>decision_by</code> : string</li><li><code>decision_at</code> : timestamp</li><li><code>decision_note</code> : string</li><li><code>decision_manpower</code> : map</li></ul></li>
+<li><b>operational_configs/{wh_id}</b> — Kapasitas &amp; rasio manpower (dibuat seed-config, lalu diubah App). Penulis: Python → App. Contoh ID <code>WH-CKG-01</code><ul><li><code>wh_id</code> : string</li><li><code>capacity_rider</code> : number</li><li><code>capacity_driver</code> : number</li><li><code>capacity_op_inbound</code> : number</li><li><code>capacity_op_outbound</code> : number</li><li><code>ratio_rider</code> : number</li><li><code>ratio_driver</code> : number</li><li><code>rounding</code> : string</li><li><code>updated_by</code> : string</li><li><code>updated_at</code> : timestamp</li><li><b>history/{auto}</b> — Riwayat perubahan konfigurasi (append-only). Penulis: App. Contoh ID <code>Xk2pQ9aLm3</code><ul><li><code>(salinan field konfigurasi)</code> : —</li><li><code>changed_by</code> : string</li><li><code>changed_at</code> : timestamp</li><li><code>note</code> : string</li><li><code>changed_by_name</code> : string</li></ul></li></ul></li>
+<li><b>model_health/{wh_id}</b> — Status drift &amp; metrik model aktif. Penulis: Python. Contoh ID <code>WH-CKG-01</code><ul><li><code>wh_id</code> : string</li><li><code>status</code> : string</li><li><code>rolling_mae_7d</code> : number</li><li><code>rolling_window_days</code> : int</li><li><code>n_points</code> : int</li><li><code>last_evaluated_date</code> : string YYYY-MM-DD</li><li><code>baseline_mae</code> : number</li><li><code>drift_threshold</code> : number</li><li><code>drift_factor</code> : number</li><li><code>model_version</code> : string</li><li><code>mae_validation</code> : number</li><li><code>mae_validation_paket</code> : number</li><li><code>rmse</code> : number</li><li><code>rmse_paket</code> : number</li><li><code>r2</code> : number</li><li><code>feature_importance</code> : map&lt;string,number&gt;</li><li><code>trained_at</code> : string ISO-8601</li><li><code>is_dummy_data</code> : bool</li><li><code>updated_at</code> : timestamp</li></ul></li>
+<li><b>model_health_history/{wh_id}_{YYYYMMDD}</b> — Rolling MAE harian (tanggal data). Penulis: Python. Contoh ID <code>WH-CKG-01_20261008</code><ul><li><code>wh_id</code> : string</li><li><code>date</code> : string YYYY-MM-DD</li><li><code>rolling_mae_7d</code> : number</li><li><code>status</code> : string</li><li><code>baseline_mae</code> : number</li><li><code>drift_threshold</code> : number</li><li><code>n_points</code> : int</li><li><code>model_version</code> : string</li><li><code>updated_at</code> : timestamp</li></ul></li>
+<li><b>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</b> — Log tiap eksekusi predict. Penulis: Python. Contoh ID <code>WH-CKG-01_20261009</code><ul><li><code>wh_id</code> : string</li><li><code>target_date</code> : string YYYY-MM-DD</li><li><code>started_at</code> : timestamp</li><li><code>finished_at</code> : timestamp</li><li><code>duration_s</code> : number</li><li><code>status</code> : string</li><li><code>message</code> : string</li><li><code>retries</code> : int</li><li><code>source</code> : string|null</li><li><code>data_status</code> : string|null</li><li><code>model_version</code> : string|null</li><li><code>predicted</code> : int|null</li><li><code>evaluated_dates</code> : array&lt;string&gt;</li><li><code>error</code> : string|null</li><li><code>dry_run</code> : bool</li></ul></li>
+<li><b>dataset_status/{wh_id}</b> — Status impor &amp; batch terakhir. Penulis: Python. Contoh ID <code>WH-CKG-01</code><ul><li><code>wh_id</code> : string</li><li><code>last_import_at</code> : timestamp</li><li><code>range_start</code> : string</li><li><code>range_end</code> : string</li><li><code>row_count</code> : int</li><li><code>labeled_count</code> : int</li><li><code>last_actual_date</code> : string|null</li><li><code>target_dates</code> : array&lt;string&gt;</li><li><code>missing_dates</code> : array&lt;string&gt;</li><li><code>source_file</code> : string</li><li><code>is_dummy_data</code> : bool</li><li><code>last_import_written_rows</code> : int</li><li><code>last_batch_at</code> : timestamp</li><li><code>last_batch_status</code> : string</li><li><code>last_batch_target_date</code> : string</li></ul></li>
+<li><b>notifications/{type}_{wh_id}_{YYYYMMDD}</b> — Notifikasi dalam aplikasi (ID deterministik). Penulis: Python (+ App: read_by). Contoh ID <code>deviation_WH-CKG-01_20261009</code><ul><li><code>type</code> : string</li><li><code>title</code> : string</li><li><code>body</code> : string</li><li><code>severity</code> : string</li><li><code>wh_id</code> : string</li><li><code>target_date</code> : string</li><li><code>created_at</code> : timestamp</li><li><code>audience_roles</code> : array&lt;string&gt;</li><li><code>updated_at</code> : timestamp</li><li><code>batch_status</code> : string</li><li><code>batch_log_id</code> : string</li><li><code>deviation_pct</code> : number</li><li><code>rolling_mae_7d</code> : number</li><li><code>drift_threshold</code> : number</li><li><code>read_by</code> : array&lt;string&gt;</li></ul></li>
+<li><b>decision_logs/{auto}</b> — Keputusan manpower (milik App, append-only). Penulis: App. Contoh ID <code>Rz8TnB4cWq</code><ul><li><code>wh_id</code> : string</li><li><code>target_date</code> : string</li><li><code>prediction_id</code> : string</li><li><code>recommended</code> : map</li><li><code>final</code> : map</li><li><code>decision_status</code> : string</li><li><code>note</code> : string|null</li><li><code>decided_by</code> : string</li><li><code>decided_at</code> : timestamp</li><li><code>decided_by_name</code> : string</li></ul></li>
 </ul></li></ul>
-<p>Referensi antar koleksi: <code>wh_id</code> → <code>warehouses</code>; <code>pred_id</code> → <code>predictions</code>; <code>decided_by</code>, <code>changed_by</code>, <code>updated_by</code>, <code>actual_input_by</code> → <code>users</code>; ID <code>notification_reads</code> = ID <code>notifications</code>.</p>
+<p>Referensi antar koleksi: <code>wh_id</code> → <code>warehouses</code>; <code>prediction_id</code> → <code>predictions</code>; <code>decided_by</code>, <code>decision_by</code>, <code>changed_by</code>, <code>updated_by</code>, <code>actual_input_by</code>, <code>read_by[]</code> → <code>users</code>; <code>batch_log_id</code> → <code>batch_logs</code>.</p>
 <h2>3. Struktur logis (Object Diagram)</h2><p>Satu objek contoh per koleksi. Nilai bersifat ilustrasi (skenario desain: Predicted 18.420 vs Projection 15.900), bukan hasil model.</p>
 <pre class="plantuml">@startuml db_object
 skinparam defaultFontName Arial
@@ -50,201 +50,254 @@ skinparam shadowing false
 left to right direction
 object &quot;warehouses/WH-CKG-01&quot; as w {
   name = &quot;Hub Cakung&quot;
-  city = &quot;Jakarta Timur&quot;
+  code = &quot;WH-CKG-01&quot;
+  timezone = &quot;Asia/Jakarta&quot;
 }
 object &quot;users/uid-manajer&quot; as u {
-  display_name = &quot;Budi Santoso&quot;
-  role = &quot;manajer&quot;
-  wh_id = &quot;WH-CKG-01&quot;
-  job_title = &quot;Manajer Warehouse&quot;
-}
-object &quot;notification_reads/deviation_WH-CKG-01_20261004&quot; as nr {
-  read_at = 2026-10-03T16:02Z
+  name = &quot;Budi Santoso&quot;
+  role = &quot;manager&quot;
 }
 object &quot;daily_data/WH-CKG-01_20261008&quot; as d {
   date = &quot;2026-10-08&quot;
+  campaign = 0
+  payday = 0
   projection_inbound = 16200
   actual_inbound = 17560
-  backlog_h1 = 512
+  actual_source = &quot;app&quot;
 }
 object &quot;predictions/pred_WH-CKG-01_20261009&quot; as p {
   target_date = &quot;2026-10-09&quot;
   predicted = 18420
   projection = 15900
-  deviation_pct = 15.8
+  deviation_pct = 15.85
   alert = true
+  status = &quot;Perlu Perhatian&quot;
   data_status = &quot;complete&quot;
-  manpower = {rider: 37, driver: 7, op_inbound: 37, op_outbound: 31}
+  input_features = {hari: 4, bulan: 10, actual_h1: 17560, …}
+  manpower = {rider: 37, driver: 7, op_inbound: 37, op_outbound: 31, config_snapshot: {…}}
   actual_inbound = null
+  decision_status = &quot;approved&quot;
+  decision_by = &quot;uid-manajer&quot;
 }
 object &quot;operational_configs/WH-CKG-01&quot; as c {
+  wh_id = &quot;WH-CKG-01&quot;
   capacity_rider = 350
   capacity_driver = 800
   ratio_rider = 0.7
   ratio_driver = 0.3
   updated_by = &quot;uid-manajer&quot;
 }
-object &quot;config_history/seed_1&quot; as h {
+object &quot;operational_configs/WH-CKG-01/history/seed_1&quot; as h {
+  capacity_op_outbound = 600
   changed_by = &quot;uid-manajer&quot;
-  old_values = {capacity_op_outbound: 580}
-  new_values = {capacity_op_outbound: 600}
+  note = &quot;Capacity_Op_Outbound: 580 → 600&quot;
 }
 object &quot;decision_logs/Rz8TnB4cWq&quot; as dl {
-  pred_id = &quot;pred_WH-CKG-01_20261009&quot;
+  prediction_id = &quot;pred_WH-CKG-01_20261009&quot;
+  decision_status = &quot;approved&quot;
+  final = {rider: 37, driver: 7, op_inbound: 37, op_outbound: 31}
+  note = null
   decided_by = &quot;uid-manajer&quot;
-  decision = &quot;approved&quot;
-  reason = null
 }
 object &quot;model_health/WH-CKG-01&quot; as mh {
   status = &quot;healthy&quot;
   rolling_mae_7d = 6.8
+  n_points = 7
   baseline_mae = 6.2
   drift_threshold = 7.13
+  drift_factor = 1.15
 }
 object &quot;model_health_history/WH-CKG-01_20261008&quot; as mhh {
   date = &quot;2026-10-08&quot;
   rolling_mae_7d = 6.8
+  n_points = 7
 }
-object &quot;batch_logs/WH-CKG-01_20261008&quot; as b {
+object &quot;batch_logs/WH-CKG-01_20261009&quot; as b {
+  target_date = &quot;2026-10-09&quot;
   status = &quot;success&quot;
-  duration_sec = 134
-  retry_count = 0
+  duration_s = 134.0
+  retries = 0
   source = &quot;H-1&quot;
 }
 object &quot;dataset_status/WH-CKG-01&quot; as ds {
   range_start = &quot;2025-01-01&quot;
-  range_end = &quot;2026-10-08&quot;
-  row_count = 646
+  range_end = &quot;2026-10-09&quot;
+  row_count = 647
+  labeled_count = 646
 }
 object &quot;notifications/deviation_WH-CKG-01_20261009&quot; as n {
   type = &quot;deviation&quot;
-  audience_roles = [admin, manajer, supervisor, viewer]
+  severity = &quot;warning&quot;
+  audience_roles = [admin, manager, supervisor]
+  read_by = [&quot;uid-admin&quot;]
 }
-u --&gt; w : wh_id
 p --&gt; w : wh_id
 d --&gt; w : wh_id
-c --&gt; w : id = wh
+c --&gt; w : wh_id
+c --&gt; h : sub-koleksi history
 c --&gt; u : updated_by
 h --&gt; u : changed_by
-dl --&gt; p : pred_id
+dl --&gt; p : prediction_id
 dl --&gt; u : decided_by
-mh --&gt; w : id = wh
+p --&gt; u : decision_by
+mh --&gt; w : id = wh_id
 mhh --&gt; w : wh_id
 b --&gt; w : wh_id
-ds --&gt; w : id = wh
+ds --&gt; w : id = wh_id
 n --&gt; w : wh_id
-u --&gt; nr : sub-koleksi
-nr --&gt; n : id = notifId
+n --&gt; u : read_by[]
 @enduml</pre>
 <p><img class="diagram" src="img/db_object.png" alt="db_object"></p>
 <h2>4. Spesifikasi basis data</h2>
 <table><tr><th>No</th><th>Nama Field</th><th>Tipe Data</th><th>Koleksi</th><th>Deskripsi</th><th>Constraint / Index</th></tr>
-<tr><td>1</td><td><code>display_name</code></td><td>string</td><td><code>users/{uid}</code></td><td>Nama tampil</td><td>wajib</td></tr>
-<tr><td>2</td><td><code>email</code></td><td>string</td><td><code>users/{uid}</code></td><td>Email login (sama dengan Firebase Auth)</td><td>wajib</td></tr>
-<tr><td>3</td><td><code>role</code></td><td>string</td><td><code>users/{uid}</code></td><td>admin | manajer | supervisor | viewer</td><td>wajib; sumber RBAC rules</td></tr>
-<tr><td>4</td><td><code>wh_id</code></td><td>string</td><td><code>users/{uid}</code></td><td>Gudang pengguna → warehouses</td><td>wajib; default WH-CKG-01</td></tr>
-<tr><td>5</td><td><code>job_title</code></td><td>string|null</td><td><code>users/{uid}</code></td><td>Label chip role (mis. Manajer Warehouse)</td><td>opsional</td></tr>
-<tr><td>6</td><td><code>read_at</code></td><td>timestamp</td><td><code>users/{uid}/notification_reads/{notifId}</code></td><td>Waktu ditandai dibaca</td><td>rules: baca/tulis hanya pemilik (uid)</td></tr>
-<tr><td>7</td><td><code>name</code></td><td>string</td><td><code>warehouses/{wh}</code></td><td>Nama gudang (Hub Cakung)</td><td>wajib</td></tr>
-<tr><td>8</td><td><code>city</code></td><td>string</td><td><code>warehouses/{wh}</code></td><td>Kota</td><td>opsional</td></tr>
-<tr><td>9</td><td><code>wh_id</code></td><td>string</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Gudang</td><td>wajib</td></tr>
-<tr><td>10</td><td><code>date</code></td><td>string YYYY-MM-DD</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Tanggal data (WIB)</td><td>wajib</td></tr>
-<tr><td>11</td><td><code>day_of_week</code></td><td>int</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>1=Senin … 7=Minggu</td><td>1–7</td></tr>
-<tr><td>12</td><td><code>month</code></td><td>int</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Bulan</td><td>1–12</td></tr>
-<tr><td>13</td><td><code>is_campaign</code></td><td>bool</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Ada campaign</td><td></td></tr>
-<tr><td>14</td><td><code>is_holiday</code></td><td>bool</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Hari libur</td><td></td></tr>
-<tr><td>15</td><td><code>is_payday</code></td><td>bool</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Periode gajian</td><td></td></tr>
-<tr><td>16</td><td><code>pickup_request_h1</code></td><td>int|null</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Pickup request H-1</td><td>≥ 0</td></tr>
-<tr><td>17</td><td><code>projection_inbound</code></td><td>int</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Projection Tim DI</td><td>≥ 0</td></tr>
-<tr><td>18</td><td><code>backlog_h1</code></td><td>int|null</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Backlog H-1</td><td>≥ 0</td></tr>
-<tr><td>19</td><td><code>actual_inbound_h2</code></td><td>int|null</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Actual H-2</td><td>≥ 0</td></tr>
-<tr><td>20</td><td><code>actual_inbound_h1</code></td><td>int|null</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Actual H-1</td><td>≥ 0</td></tr>
-<tr><td>21</td><td><code>actual_inbound</code></td><td>int|null</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Actual hari itu</td><td>≥ 0</td></tr>
-<tr><td>22</td><td><code>source_file</code></td><td>string</td><td><code>daily_data/{wh}_{YYYYMMDD}</code></td><td>Nama berkas Excel</td><td>[USULAN]</td></tr>
-<tr><td>23</td><td><code>wh_id</code></td><td>string</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Gudang</td><td>wajib; indeks (wh_id ASC, target_date DESC)</td></tr>
-<tr><td>24</td><td><code>target_date</code></td><td>string YYYY-MM-DD</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Tanggal yang diprediksi</td><td>wajib; indeks</td></tr>
-<tr><td>25</td><td><code>predicted</code></td><td>int</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Prediksi Random Forest (paket)</td><td>≥ 0</td></tr>
-<tr><td>26</td><td><code>projection</code></td><td>int</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Projection Tim DI</td><td>&gt; 0</td></tr>
-<tr><td>27</td><td><code>deviation_pct</code></td><td>double</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>(predicted − projection) / projection × 100</td><td></td></tr>
-<tr><td>28</td><td><code>alert</code></td><td>bool</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>|deviation_pct| &gt; 15</td><td></td></tr>
-<tr><td>29</td><td><code>status</code></td><td>string</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>normal | perlu_perhatian</td><td></td></tr>
-<tr><td>30</td><td><code>data_status</code></td><td>string</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>complete | incomplete_fallback_h2</td><td></td></tr>
-<tr><td>31</td><td><code>source</code></td><td>string</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>H-1 | H-2</td><td></td></tr>
-<tr><td>32</td><td><code>model_version</code></td><td>string</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Versi model (v1.0)</td><td></td></tr>
-<tr><td>33</td><td><code>generated_at</code></td><td>timestamp</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Waktu batch</td><td></td></tr>
-<tr><td>34</td><td><code>input_features</code></td><td>map (10 fitur)</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Embed: fitur prediktor (lihat daily_data)</td><td>nilai boleh null</td></tr>
-<tr><td>35</td><td><code>feature_importance</code></td><td>map&lt;string,double&gt;</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Embed: bobot fitur 0–1</td><td></td></tr>
-<tr><td>36</td><td><code>manpower</code></td><td>map</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Embed: rider, driver, op_inbound, op_outbound (int, ceil) + config_snapshot</td><td></td></tr>
-<tr><td>37</td><td><code>is_backfill</code></td><td>bool</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Prediksi backfill historis</td><td></td></tr>
-<tr><td>38</td><td><code>actual_inbound</code></td><td>int|null</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Actual dari aplikasi</td><td>rules: int ≥ 0; hanya admin/supervisor; hanya field actual_*</td></tr>
-<tr><td>39</td><td><code>actual_note</code></td><td>string|null</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Catatan actual</td><td>rules: ≤ 500 karakter</td></tr>
-<tr><td>40</td><td><code>actual_input_by</code></td><td>string (uid)</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Penginput → users</td><td>rules: == request.auth.uid</td></tr>
-<tr><td>41</td><td><code>actual_input_at</code></td><td>timestamp</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Waktu input</td><td>serverTimestamp</td></tr>
-<tr><td>42</td><td><code>daily_error_pct</code></td><td>double|null</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>|predicted − actual| / actual × 100</td><td>ditulis script</td></tr>
-<tr><td>43</td><td><code>evaluated</code></td><td>bool</td><td><code>predictions/pred_{wh}_{YYYYMMDD}</code></td><td>Sudah dievaluasi</td><td>ditulis script</td></tr>
-<tr><td>44</td><td><code>capacity_rider</code></td><td>number</td><td><code>operational_configs/{wh}</code></td><td>Paket/orang/hari Rider</td><td>rules: &gt; 0</td></tr>
-<tr><td>45</td><td><code>capacity_driver</code></td><td>number</td><td><code>operational_configs/{wh}</code></td><td>Paket/orang/hari Driver</td><td>rules: &gt; 0</td></tr>
-<tr><td>46</td><td><code>capacity_op_inbound</code></td><td>number</td><td><code>operational_configs/{wh}</code></td><td>Paket/orang/hari Op. Inbound</td><td>rules: &gt; 0</td></tr>
-<tr><td>47</td><td><code>capacity_op_outbound</code></td><td>number</td><td><code>operational_configs/{wh}</code></td><td>Paket/orang/hari Op. Outbound</td><td>rules: &gt; 0</td></tr>
-<tr><td>48</td><td><code>ratio_rider</code></td><td>number</td><td><code>operational_configs/{wh}</code></td><td>Porsi paket Rider</td><td>rules: &gt; 0; ratio_rider + ratio_driver = 1,00 ± 0,001</td></tr>
-<tr><td>49</td><td><code>ratio_driver</code></td><td>number</td><td><code>operational_configs/{wh}</code></td><td>Porsi paket Driver</td><td>rules: &gt; 0</td></tr>
-<tr><td>50</td><td><code>rounding</code></td><td>string</td><td><code>operational_configs/{wh}</code></td><td>Metode pembulatan</td><td>ceil</td></tr>
-<tr><td>51</td><td><code>updated_by</code></td><td>string (uid)</td><td><code>operational_configs/{wh}</code></td><td>Pengubah terakhir → users</td><td>rules: == request.auth.uid</td></tr>
-<tr><td>52</td><td><code>updated_at</code></td><td>timestamp</td><td><code>operational_configs/{wh}</code></td><td>Waktu ubah</td><td>rules: hanya key yang diizinkan</td></tr>
-<tr><td>53</td><td><code>wh_id</code></td><td>string</td><td><code>config_history/{auto}</code></td><td>Gudang</td><td>indeks (wh_id ASC, changed_at DESC)</td></tr>
-<tr><td>54</td><td><code>changed_by</code></td><td>string (uid)</td><td><code>config_history/{auto}</code></td><td>Pengubah → users</td><td>rules: == request.auth.uid</td></tr>
-<tr><td>55</td><td><code>changed_by_name</code></td><td>string</td><td><code>config_history/{auto}</code></td><td>Nama pengubah (denormalisasi)</td><td></td></tr>
-<tr><td>56</td><td><code>changed_at</code></td><td>timestamp</td><td><code>config_history/{auto}</code></td><td>Waktu ubah</td><td>indeks</td></tr>
-<tr><td>57</td><td><code>old_values</code></td><td>map&lt;string,number&gt;</td><td><code>config_history/{auto}</code></td><td>Nilai sebelum</td><td></td></tr>
-<tr><td>58</td><td><code>new_values</code></td><td>map&lt;string,number&gt;</td><td><code>config_history/{auto}</code></td><td>Nilai sesudah</td><td>rules: tanpa update/delete</td></tr>
-<tr><td>59</td><td><code>pred_id</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>→ predictions (referensi)</td><td>indeks (pred_id ASC, decided_at DESC)</td></tr>
-<tr><td>60</td><td><code>wh_id</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>Gudang</td><td>indeks (wh_id ASC, decided_at DESC)</td></tr>
-<tr><td>61</td><td><code>decided_by</code></td><td>string (uid)</td><td><code>decision_logs/{auto}</code></td><td>Pengambil keputusan → users</td><td>rules: == request.auth.uid</td></tr>
-<tr><td>62</td><td><code>decided_by_name</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>Nama (denormalisasi)</td><td></td></tr>
-<tr><td>63</td><td><code>decision</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>approved | adjusted</td><td>rules: in [&#x27;approved&#x27;,&#x27;adjusted&#x27;]</td></tr>
-<tr><td>64</td><td><code>manpower_final</code></td><td>map</td><td><code>decision_logs/{auto}</code></td><td>rider, driver, op_inbound, op_outbound final</td><td></td></tr>
-<tr><td>65</td><td><code>reason</code></td><td>string|null</td><td><code>decision_logs/{auto}</code></td><td>Alasan penyesuaian</td><td>rules: wajib &amp; tidak kosong bila adjusted</td></tr>
-<tr><td>66</td><td><code>decided_at</code></td><td>timestamp</td><td><code>decision_logs/{auto}</code></td><td>Waktu keputusan</td><td>rules: viewer tidak boleh baca; tanpa update/delete</td></tr>
-<tr><td>67</td><td><code>status</code></td><td>string</td><td><code>model_health/{wh}</code></td><td>healthy | degraded</td><td></td></tr>
-<tr><td>68</td><td><code>rolling_mae_7d</code></td><td>double</td><td><code>model_health/{wh}</code></td><td>Rolling MAE 7 hari (%)</td><td></td></tr>
-<tr><td>69</td><td><code>baseline_mae</code></td><td>double</td><td><code>model_health/{wh}</code></td><td>MAE validasi model aktif (%)</td><td></td></tr>
-<tr><td>70</td><td><code>drift_threshold</code></td><td>double</td><td><code>model_health/{wh}</code></td><td>1,15 × baseline</td><td></td></tr>
-<tr><td>71</td><td><code>model_version</code></td><td>string</td><td><code>model_health/{wh}</code></td><td>Versi model</td><td></td></tr>
-<tr><td>72</td><td><code>mae_validation</code></td><td>double</td><td><code>model_health/{wh}</code></td><td>MAE validasi (%)</td><td></td></tr>
-<tr><td>73</td><td><code>rmse</code></td><td>double</td><td><code>model_health/{wh}</code></td><td>RMSE (%)</td><td></td></tr>
-<tr><td>74</td><td><code>r2</code></td><td>double</td><td><code>model_health/{wh}</code></td><td>Koefisien determinasi</td><td></td></tr>
-<tr><td>75</td><td><code>feature_importance</code></td><td>map&lt;string,double&gt;</td><td><code>model_health/{wh}</code></td><td>Bobot fitur model aktif</td><td></td></tr>
-<tr><td>76</td><td><code>updated_at</code></td><td>timestamp</td><td><code>model_health/{wh}</code></td><td>Waktu hitung</td><td></td></tr>
-<tr><td>77</td><td><code>wh_id</code></td><td>string</td><td><code>model_health_history/{wh}_{YYYYMMDD}</code></td><td>Gudang</td><td>indeks (wh_id ASC, date ASC)</td></tr>
-<tr><td>78</td><td><code>date</code></td><td>string YYYY-MM-DD</td><td><code>model_health_history/{wh}_{YYYYMMDD}</code></td><td>Tanggal</td><td>indeks</td></tr>
-<tr><td>79</td><td><code>rolling_mae_7d</code></td><td>double</td><td><code>model_health_history/{wh}_{YYYYMMDD}</code></td><td>Rolling MAE 7 hari (%)</td><td></td></tr>
-<tr><td>80</td><td><code>baseline_mae</code></td><td>double</td><td><code>model_health_history/{wh}_{YYYYMMDD}</code></td><td>Baseline (%)</td><td></td></tr>
-<tr><td>81</td><td><code>drift_threshold</code></td><td>double</td><td><code>model_health_history/{wh}_{YYYYMMDD}</code></td><td>Ambang drift (%)</td><td></td></tr>
-<tr><td>82</td><td><code>status</code></td><td>string</td><td><code>model_health_history/{wh}_{YYYYMMDD}</code></td><td>healthy | degraded</td><td></td></tr>
-<tr><td>83</td><td><code>wh_id</code></td><td>string</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>Gudang</td><td>indeks (wh_id ASC, started_at DESC)</td></tr>
-<tr><td>84</td><td><code>run_date</code></td><td>string YYYY-MM-DD</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>Tanggal eksekusi</td><td></td></tr>
-<tr><td>85</td><td><code>target_date</code></td><td>string YYYY-MM-DD</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>Tanggal target</td><td></td></tr>
-<tr><td>86</td><td><code>started_at</code></td><td>timestamp</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>Mulai</td><td>indeks</td></tr>
-<tr><td>87</td><td><code>finished_at</code></td><td>timestamp</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>Selesai</td><td></td></tr>
-<tr><td>88</td><td><code>duration_sec</code></td><td>int</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>Durasi (detik)</td><td>≥ 0</td></tr>
-<tr><td>89</td><td><code>status</code></td><td>string</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>success | failed</td><td></td></tr>
-<tr><td>90</td><td><code>retry_count</code></td><td>int</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>Jumlah retry</td><td>≥ 0</td></tr>
-<tr><td>91</td><td><code>source</code></td><td>string</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>H-1 | H-2</td><td></td></tr>
-<tr><td>92</td><td><code>message</code></td><td>string|null</td><td><code>batch_logs/{wh}_{YYYYMMDD}</code></td><td>Keterangan</td><td></td></tr>
-<tr><td>93</td><td><code>wh_id</code></td><td>string</td><td><code>dataset_status/{wh}</code></td><td>Gudang</td><td></td></tr>
-<tr><td>94</td><td><code>last_import_at</code></td><td>timestamp</td><td><code>dataset_status/{wh}</code></td><td>Impor terakhir</td><td></td></tr>
-<tr><td>95</td><td><code>range_start</code></td><td>string YYYY-MM-DD</td><td><code>dataset_status/{wh}</code></td><td>Awal data</td><td></td></tr>
-<tr><td>96</td><td><code>range_end</code></td><td>string YYYY-MM-DD</td><td><code>dataset_status/{wh}</code></td><td>Akhir data</td><td></td></tr>
-<tr><td>97</td><td><code>row_count</code></td><td>int</td><td><code>dataset_status/{wh}</code></td><td>Jumlah baris</td><td>≥ 0</td></tr>
-<tr><td>98</td><td><code>source_file</code></td><td>string</td><td><code>dataset_status/{wh}</code></td><td>Berkas sumber</td><td></td></tr>
-<tr><td>99</td><td><code>type</code></td><td>string</td><td><code>notifications/{type}_{wh}_{YYYYMMDD}</code></td><td>deviation | degraded | incomplete | batch</td><td></td></tr>
-<tr><td>100</td><td><code>title</code></td><td>string</td><td><code>notifications/{type}_{wh}_{YYYYMMDD}</code></td><td>Judul</td><td></td></tr>
-<tr><td>101</td><td><code>body</code></td><td>string</td><td><code>notifications/{type}_{wh}_{YYYYMMDD}</code></td><td>Isi</td><td></td></tr>
-<tr><td>102</td><td><code>wh_id</code></td><td>string</td><td><code>notifications/{type}_{wh}_{YYYYMMDD}</code></td><td>Gudang</td><td></td></tr>
-<tr><td>103</td><td><code>target_date</code></td><td>string YYYY-MM-DD</td><td><code>notifications/{type}_{wh}_{YYYYMMDD}</code></td><td>Tanggal terkait</td><td></td></tr>
-<tr><td>104</td><td><code>created_at</code></td><td>timestamp</td><td><code>notifications/{type}_{wh}_{YYYYMMDD}</code></td><td>Waktu dibuat</td><td>indeks (audience_roles CONTAINS, created_at DESC)</td></tr>
-<tr><td>105</td><td><code>audience_roles</code></td><td>array&lt;string&gt;</td><td><code>notifications/{type}_{wh}_{YYYYMMDD}</code></td><td>Role penerima</td><td>rules: baca bila role ∈ audience_roles; tanpa tulis klien</td></tr>
+<tr><td>1</td><td><code>name</code></td><td>string</td><td><code>warehouses/{wh_id}</code></td><td>Nama gudang</td><td>wajib</td></tr>
+<tr><td>2</td><td><code>code</code></td><td>string</td><td><code>warehouses/{wh_id}</code></td><td>Sama dengan wh_id</td><td>wajib</td></tr>
+<tr><td>3</td><td><code>timezone</code></td><td>string</td><td><code>warehouses/{wh_id}</code></td><td>Asia/Jakarta</td><td>wajib</td></tr>
+<tr><td>4</td><td><code>created_at</code></td><td>timestamp</td><td><code>warehouses/{wh_id}</code></td><td>Waktu seed</td><td>wajib; rules: klien hanya baca</td></tr>
+<tr><td>5</td><td><code>role</code></td><td>string</td><td><code>users/{uid}</code></td><td>admin | manager | supervisor | viewer</td><td>wajib; sumber RBAC rules; rules: baca pemilik saja, tanpa tulis klien</td></tr>
+<tr><td>6</td><td><code>name</code></td><td>string</td><td><code>users/{uid}</code></td><td>Nama tampil (email diambil dari Firebase Auth)</td><td>wajib</td></tr>
+<tr><td>7</td><td><code>wh_id</code></td><td>string</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Gudang</td><td>wajib</td></tr>
+<tr><td>8</td><td><code>date</code></td><td>string YYYY-MM-DD</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Tanggal data (Asia/Jakarta)</td><td>wajib</td></tr>
+<tr><td>9</td><td><code>campaign</code></td><td>int 0/1</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Ada campaign</td><td>wajib; null bila kosong di Excel</td></tr>
+<tr><td>10</td><td><code>hari_libur</code></td><td>int 0/1</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Hari libur</td><td>wajib</td></tr>
+<tr><td>11</td><td><code>payday</code></td><td>int 0/1</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Periode gajian</td><td>wajib</td></tr>
+<tr><td>12</td><td><code>pickup_request_h1</code></td><td>int</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Pickup request H-1 relatif terhadap date</td><td>wajib</td></tr>
+<tr><td>13</td><td><code>projection_inbound</code></td><td>int</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Projection Tim DI untuk date</td><td>wajib</td></tr>
+<tr><td>14</td><td><code>backlog_h1</code></td><td>int</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Backlog H-1 relatif terhadap date</td><td>wajib</td></tr>
+<tr><td>15</td><td><code>actual_inbound</code></td><td>int|null</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Actual dari Excel atau disalin evaluate dari aplikasi</td><td>wajib</td></tr>
+<tr><td>16</td><td><code>actual_source</code></td><td>string</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>excel | app (app tidak pernah ditimpa Excel)</td><td>opsional</td></tr>
+<tr><td>17</td><td><code>actual_synced_at</code></td><td>timestamp</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Saat actual aplikasi disalin</td><td>opsional</td></tr>
+<tr><td>18</td><td><code>row_hash</code></td><td>string</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>SHA-1 isi baris Excel</td><td>wajib*</td></tr>
+<tr><td>19</td><td><code>source_file</code></td><td>string</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Nama berkas Excel</td><td>wajib*</td></tr>
+<tr><td>20</td><td><code>imported_at</code></td><td>timestamp</td><td><code>daily_data/{wh_id}_{YYYYMMDD}</code></td><td>Waktu impor</td><td>wajib*; rules: klien hanya baca</td></tr>
+<tr><td>21</td><td><code>wh_id</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Gudang</td><td>wajib; indeks (wh_id ASC, target_date DESC), (wh_id, evaluated, target_date DESC)</td></tr>
+<tr><td>22</td><td><code>target_date</code></td><td>string YYYY-MM-DD</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Tanggal yang diprediksi</td><td>wajib</td></tr>
+<tr><td>23</td><td><code>predicted</code></td><td>int</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Prediksi RF (paket utuh)</td><td>wajib</td></tr>
+<tr><td>24</td><td><code>projection</code></td><td>int|null</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Projection Tim DI</td><td>wajib</td></tr>
+<tr><td>25</td><td><code>deviation_pct</code></td><td>number|null</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>(predicted − projection) / projection × 100, 2 desimal</td><td>wajib</td></tr>
+<tr><td>26</td><td><code>alert</code></td><td>bool</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>|deviation_pct| &gt; 15</td><td>wajib</td></tr>
+<tr><td>27</td><td><code>status</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>&quot;Perlu Perhatian&quot; | &quot;Normal&quot;</td><td>wajib</td></tr>
+<tr><td>28</td><td><code>data_status</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>complete | incomplete_fallback_h2</td><td>wajib</td></tr>
+<tr><td>29</td><td><code>source</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>H-1 | H-2</td><td>wajib</td></tr>
+<tr><td>30</td><td><code>model_version</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Versi model</td><td>wajib</td></tr>
+<tr><td>31</td><td><code>generated_at</code></td><td>timestamp</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Waktu batch</td><td>wajib</td></tr>
+<tr><td>32</td><td><code>input_features</code></td><td>map&lt;string,number&gt;</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Embed: hari, bulan, campaign, hari_libur, payday, pickup_request_h1, projection_inbound, backlog_h1, actual_h2, actual_h1</td><td>wajib</td></tr>
+<tr><td>33</td><td><code>feature_importance</code></td><td>map&lt;string,number&gt;</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Embed: importance 10 fitur (≈ 1)</td><td>wajib</td></tr>
+<tr><td>34</td><td><code>manpower</code></td><td>map</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Embed: rider, driver, op_inbound, op_outbound + config_snapshot (kapasitas, rasio, rounding, source)</td><td>wajib</td></tr>
+<tr><td>35</td><td><code>is_backfill</code></td><td>bool</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Estimasi historis walk-forward</td><td>wajib</td></tr>
+<tr><td>36</td><td><code>is_dummy_data</code></td><td>bool</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Memakai Excel dummy</td><td>wajib</td></tr>
+<tr><td>37</td><td><code>notes</code></td><td>array&lt;string&gt;</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Catatan (fallback, imputasi, backfill)</td><td>wajib</td></tr>
+<tr><td>38</td><td><code>evaluated</code></td><td>bool</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Sudah dievaluasi</td><td>wajib (Python evaluate)</td></tr>
+<tr><td>39</td><td><code>daily_error_pct</code></td><td>number|null</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>|predicted − actual| / actual × 100</td><td>opsional (evaluate)</td></tr>
+<tr><td>40</td><td><code>evaluated_at</code></td><td>timestamp</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Waktu evaluasi</td><td>opsional (evaluate)</td></tr>
+<tr><td>41</td><td><code>actual_inbound</code></td><td>int</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Actual input pengguna</td><td>App; rules: int ≥ 0, admin/supervisor, hanya actual_*</td></tr>
+<tr><td>42</td><td><code>actual_note</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Catatan actual</td><td>App; rules: ≤ 500 karakter</td></tr>
+<tr><td>43</td><td><code>actual_input_by</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>uid penginput (backfill: &quot;backfill:excel&quot;)</td><td>App; rules: = request.auth.uid</td></tr>
+<tr><td>44</td><td><code>actual_input_at</code></td><td>timestamp</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Waktu input</td><td>App</td></tr>
+<tr><td>45</td><td><code>decision_status</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>approved | adjusted</td><td>App; rules: admin/manager, hanya decision_*</td></tr>
+<tr><td>46</td><td><code>decision_by</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>uid pengambil keputusan</td><td>App; rules: = request.auth.uid</td></tr>
+<tr><td>47</td><td><code>decision_at</code></td><td>timestamp</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Waktu keputusan</td><td>App</td></tr>
+<tr><td>48</td><td><code>decision_note</code></td><td>string</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Alasan</td><td>App; rules: wajib bila adjusted</td></tr>
+<tr><td>49</td><td><code>decision_manpower</code></td><td>map</td><td><code>predictions/pred_{wh_id}_{YYYYMMDD}</code></td><td>Manpower final (rider, driver, op_inbound, op_outbound)</td><td>App; rules: int ≥ 0</td></tr>
+<tr><td>50</td><td><code>wh_id</code></td><td>string</td><td><code>operational_configs/{wh_id}</code></td><td>Gudang</td><td>wajib; rules: = ID dokumen</td></tr>
+<tr><td>51</td><td><code>capacity_rider</code></td><td>number</td><td><code>operational_configs/{wh_id}</code></td><td>Paket/orang/hari Rider (default 350)</td><td>rules: &gt; 0</td></tr>
+<tr><td>52</td><td><code>capacity_driver</code></td><td>number</td><td><code>operational_configs/{wh_id}</code></td><td>Driver (default 800)</td><td>rules: &gt; 0</td></tr>
+<tr><td>53</td><td><code>capacity_op_inbound</code></td><td>number</td><td><code>operational_configs/{wh_id}</code></td><td>Op. Inbound (default 500)</td><td>rules: &gt; 0</td></tr>
+<tr><td>54</td><td><code>capacity_op_outbound</code></td><td>number</td><td><code>operational_configs/{wh_id}</code></td><td>Op. Outbound (default 600)</td><td>rules: &gt; 0</td></tr>
+<tr><td>55</td><td><code>ratio_rider</code></td><td>number</td><td><code>operational_configs/{wh_id}</code></td><td>Rasio Rider (default 0,70)</td><td>rules: &gt; 0; ratio_rider + ratio_driver = 1,00 ± 0,001</td></tr>
+<tr><td>56</td><td><code>ratio_driver</code></td><td>number</td><td><code>operational_configs/{wh_id}</code></td><td>Rasio Driver (default 0,30)</td><td>rules: &gt; 0</td></tr>
+<tr><td>57</td><td><code>rounding</code></td><td>string</td><td><code>operational_configs/{wh_id}</code></td><td>ceil</td><td>wajib</td></tr>
+<tr><td>58</td><td><code>updated_by</code></td><td>string</td><td><code>operational_configs/{wh_id}</code></td><td>&quot;wipas-research:seed-config&quot; atau uid</td><td>rules: = request.auth.uid saat App menulis</td></tr>
+<tr><td>59</td><td><code>updated_at</code></td><td>timestamp</td><td><code>operational_configs/{wh_id}</code></td><td>Waktu ubah</td><td>rules: hanya key yang diizinkan</td></tr>
+<tr><td>60</td><td><code>(salinan field konfigurasi)</code></td><td>—</td><td><code>operational_configs/{wh_id}/history/{auto}</code></td><td>wh_id, capacity_*, ratio_*, rounding, updated_by, updated_at sesudah perubahan</td><td>rules: kapasitas &gt; 0, rasio = 1,00</td></tr>
+<tr><td>61</td><td><code>changed_by</code></td><td>string</td><td><code>operational_configs/{wh_id}/history/{auto}</code></td><td>uid pengubah</td><td>rules: = request.auth.uid</td></tr>
+<tr><td>62</td><td><code>changed_at</code></td><td>timestamp</td><td><code>operational_configs/{wh_id}/history/{auto}</code></td><td>Waktu ubah</td><td>orderBy changed_at DESC</td></tr>
+<tr><td>63</td><td><code>note</code></td><td>string</td><td><code>operational_configs/{wh_id}/history/{auto}</code></td><td>Ringkasan &quot;Label: lama → baru&quot;</td><td></td></tr>
+<tr><td>64</td><td><code>changed_by_name</code></td><td>string</td><td><code>operational_configs/{wh_id}/history/{auto}</code></td><td>Nama pengubah (ekstensi App)</td><td>tanpa update/delete</td></tr>
+<tr><td>65</td><td><code>wh_id</code></td><td>string</td><td><code>model_health/{wh_id}</code></td><td>Gudang</td><td>wajib</td></tr>
+<tr><td>66</td><td><code>status</code></td><td>string</td><td><code>model_health/{wh_id}</code></td><td>healthy | degraded</td><td>wajib</td></tr>
+<tr><td>67</td><td><code>rolling_mae_7d</code></td><td>number</td><td><code>model_health/{wh_id}</code></td><td>Rata-rata daily_error_pct 7 hari (%)</td><td>wajib</td></tr>
+<tr><td>68</td><td><code>rolling_window_days</code></td><td>int</td><td><code>model_health/{wh_id}</code></td><td>7</td><td>wajib</td></tr>
+<tr><td>69</td><td><code>n_points</code></td><td>int</td><td><code>model_health/{wh_id}</code></td><td>Jumlah hari dalam jendela</td><td>wajib; healthy bila &lt; 7</td></tr>
+<tr><td>70</td><td><code>last_evaluated_date</code></td><td>string YYYY-MM-DD</td><td><code>model_health/{wh_id}</code></td><td>Tanggal evaluasi terakhir</td><td>wajib</td></tr>
+<tr><td>71</td><td><code>baseline_mae</code></td><td>number</td><td><code>model_health/{wh_id}</code></td><td>MAE validasi model aktif (%)</td><td>wajib</td></tr>
+<tr><td>72</td><td><code>drift_threshold</code></td><td>number</td><td><code>model_health/{wh_id}</code></td><td>round(1,15 × baseline, 4)</td><td>wajib</td></tr>
+<tr><td>73</td><td><code>drift_factor</code></td><td>number</td><td><code>model_health/{wh_id}</code></td><td>1,15</td><td>wajib</td></tr>
+<tr><td>74</td><td><code>model_version</code></td><td>string</td><td><code>model_health/{wh_id}</code></td><td>Versi model</td><td>wajib</td></tr>
+<tr><td>75</td><td><code>mae_validation</code></td><td>number</td><td><code>model_health/{wh_id}</code></td><td>MAE validasi (%)</td><td>wajib</td></tr>
+<tr><td>76</td><td><code>mae_validation_paket</code></td><td>number</td><td><code>model_health/{wh_id}</code></td><td>MAE validasi (paket)</td><td>wajib</td></tr>
+<tr><td>77</td><td><code>rmse</code></td><td>number</td><td><code>model_health/{wh_id}</code></td><td>RMSE (% dari rata-rata actual)</td><td>wajib</td></tr>
+<tr><td>78</td><td><code>rmse_paket</code></td><td>number</td><td><code>model_health/{wh_id}</code></td><td>RMSE (paket)</td><td>wajib</td></tr>
+<tr><td>79</td><td><code>r2</code></td><td>number</td><td><code>model_health/{wh_id}</code></td><td>R² validasi</td><td>wajib</td></tr>
+<tr><td>80</td><td><code>feature_importance</code></td><td>map&lt;string,number&gt;</td><td><code>model_health/{wh_id}</code></td><td>Importance model aktif</td><td>wajib</td></tr>
+<tr><td>81</td><td><code>trained_at</code></td><td>string ISO-8601</td><td><code>model_health/{wh_id}</code></td><td>Waktu pelatihan</td><td>wajib</td></tr>
+<tr><td>82</td><td><code>is_dummy_data</code></td><td>bool</td><td><code>model_health/{wh_id}</code></td><td>Data dummy</td><td>wajib</td></tr>
+<tr><td>83</td><td><code>updated_at</code></td><td>timestamp</td><td><code>model_health/{wh_id}</code></td><td>Waktu hitung</td><td>wajib; rules: klien hanya baca</td></tr>
+<tr><td>84</td><td><code>wh_id</code></td><td>string</td><td><code>model_health_history/{wh_id}_{YYYYMMDD}</code></td><td>Gudang</td><td>indeks (wh_id ASC, date DESC)</td></tr>
+<tr><td>85</td><td><code>date</code></td><td>string YYYY-MM-DD</td><td><code>model_health_history/{wh_id}_{YYYYMMDD}</code></td><td>Tanggal data</td><td>wajib</td></tr>
+<tr><td>86</td><td><code>rolling_mae_7d</code></td><td>number</td><td><code>model_health_history/{wh_id}_{YYYYMMDD}</code></td><td>Rolling MAE (%)</td><td>wajib</td></tr>
+<tr><td>87</td><td><code>status</code></td><td>string</td><td><code>model_health_history/{wh_id}_{YYYYMMDD}</code></td><td>healthy | degraded</td><td>wajib</td></tr>
+<tr><td>88</td><td><code>baseline_mae</code></td><td>number</td><td><code>model_health_history/{wh_id}_{YYYYMMDD}</code></td><td>Baseline (%)</td><td>wajib</td></tr>
+<tr><td>89</td><td><code>drift_threshold</code></td><td>number</td><td><code>model_health_history/{wh_id}_{YYYYMMDD}</code></td><td>Ambang (%)</td><td>wajib</td></tr>
+<tr><td>90</td><td><code>n_points</code></td><td>int</td><td><code>model_health_history/{wh_id}_{YYYYMMDD}</code></td><td>Jumlah titik</td><td>wajib</td></tr>
+<tr><td>91</td><td><code>model_version</code></td><td>string</td><td><code>model_health_history/{wh_id}_{YYYYMMDD}</code></td><td>Versi model</td><td>wajib</td></tr>
+<tr><td>92</td><td><code>updated_at</code></td><td>timestamp</td><td><code>model_health_history/{wh_id}_{YYYYMMDD}</code></td><td>Waktu tulis</td><td>wajib</td></tr>
+<tr><td>93</td><td><code>wh_id</code></td><td>string</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Gudang</td><td>indeks (wh_id ASC, started_at DESC)</td></tr>
+<tr><td>94</td><td><code>target_date</code></td><td>string YYYY-MM-DD</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Tanggal target</td><td>wajib</td></tr>
+<tr><td>95</td><td><code>started_at</code></td><td>timestamp</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Mulai</td><td>wajib</td></tr>
+<tr><td>96</td><td><code>finished_at</code></td><td>timestamp</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Selesai</td><td>wajib</td></tr>
+<tr><td>97</td><td><code>duration_s</code></td><td>number</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Durasi (detik)</td><td>wajib</td></tr>
+<tr><td>98</td><td><code>status</code></td><td>string</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>success | skipped | failed</td><td>wajib</td></tr>
+<tr><td>99</td><td><code>message</code></td><td>string</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Keterangan</td><td>wajib</td></tr>
+<tr><td>100</td><td><code>retries</code></td><td>int</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Jumlah retry (maks 3 per operasi)</td><td>wajib</td></tr>
+<tr><td>101</td><td><code>source</code></td><td>string|null</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>H-1 | H-2</td><td>wajib</td></tr>
+<tr><td>102</td><td><code>data_status</code></td><td>string|null</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Status data</td><td>wajib</td></tr>
+<tr><td>103</td><td><code>model_version</code></td><td>string|null</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Versi model</td><td>wajib</td></tr>
+<tr><td>104</td><td><code>predicted</code></td><td>int|null</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Prediksi</td><td>wajib</td></tr>
+<tr><td>105</td><td><code>evaluated_dates</code></td><td>array&lt;string&gt;</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Actual yang dievaluasi di awal batch</td><td>wajib</td></tr>
+<tr><td>106</td><td><code>error</code></td><td>string|null</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Pesan galat</td><td>wajib</td></tr>
+<tr><td>107</td><td><code>dry_run</code></td><td>bool</td><td><code>batch_logs/{wh_id}_{YYYYMMDD}[_runN]</code></td><td>Mode uji</td><td>wajib; rules: klien hanya baca</td></tr>
+<tr><td>108</td><td><code>wh_id</code></td><td>string</td><td><code>dataset_status/{wh_id}</code></td><td>Gudang</td><td>wajib</td></tr>
+<tr><td>109</td><td><code>last_import_at</code></td><td>timestamp</td><td><code>dataset_status/{wh_id}</code></td><td>Impor terakhir</td><td>wajib</td></tr>
+<tr><td>110</td><td><code>range_start</code></td><td>string</td><td><code>dataset_status/{wh_id}</code></td><td>Tanggal pertama di Excel</td><td>wajib</td></tr>
+<tr><td>111</td><td><code>range_end</code></td><td>string</td><td><code>dataset_status/{wh_id}</code></td><td>Tanggal terakhir di Excel</td><td>wajib</td></tr>
+<tr><td>112</td><td><code>row_count</code></td><td>int</td><td><code>dataset_status/{wh_id}</code></td><td>Jumlah baris</td><td>wajib</td></tr>
+<tr><td>113</td><td><code>labeled_count</code></td><td>int</td><td><code>dataset_status/{wh_id}</code></td><td>Baris dengan actual</td><td>wajib</td></tr>
+<tr><td>114</td><td><code>last_actual_date</code></td><td>string|null</td><td><code>dataset_status/{wh_id}</code></td><td>Actual terakhir</td><td>wajib</td></tr>
+<tr><td>115</td><td><code>target_dates</code></td><td>array&lt;string&gt;</td><td><code>dataset_status/{wh_id}</code></td><td>Baris masa depan</td><td>wajib</td></tr>
+<tr><td>116</td><td><code>missing_dates</code></td><td>array&lt;string&gt;</td><td><code>dataset_status/{wh_id}</code></td><td>Celah tanggal</td><td>wajib</td></tr>
+<tr><td>117</td><td><code>source_file</code></td><td>string</td><td><code>dataset_status/{wh_id}</code></td><td>Berkas</td><td>wajib</td></tr>
+<tr><td>118</td><td><code>is_dummy_data</code></td><td>bool</td><td><code>dataset_status/{wh_id}</code></td><td>Data dummy</td><td>wajib</td></tr>
+<tr><td>119</td><td><code>last_import_written_rows</code></td><td>int</td><td><code>dataset_status/{wh_id}</code></td><td>Baris daily_data yang ditulis</td><td>wajib</td></tr>
+<tr><td>120</td><td><code>last_batch_at</code></td><td>timestamp</td><td><code>dataset_status/{wh_id}</code></td><td>Batch terakhir</td><td>opsional</td></tr>
+<tr><td>121</td><td><code>last_batch_status</code></td><td>string</td><td><code>dataset_status/{wh_id}</code></td><td>Status batch terakhir</td><td>opsional</td></tr>
+<tr><td>122</td><td><code>last_batch_target_date</code></td><td>string</td><td><code>dataset_status/{wh_id}</code></td><td>Target batch terakhir</td><td>opsional</td></tr>
+<tr><td>123</td><td><code>type</code></td><td>string</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>deviation | degraded | incomplete | batch</td><td>wajib</td></tr>
+<tr><td>124</td><td><code>title</code></td><td>string</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>Judul</td><td>wajib</td></tr>
+<tr><td>125</td><td><code>body</code></td><td>string</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>Isi</td><td>wajib</td></tr>
+<tr><td>126</td><td><code>severity</code></td><td>string</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>info | warning | error</td><td>wajib</td></tr>
+<tr><td>127</td><td><code>wh_id</code></td><td>string</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>Gudang</td><td>indeks (wh_id ASC, created_at DESC)</td></tr>
+<tr><td>128</td><td><code>target_date</code></td><td>string</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>Tanggal target</td><td>wajib</td></tr>
+<tr><td>129</td><td><code>created_at</code></td><td>timestamp</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>Waktu dibuat</td><td>indeks (audience_roles CONTAINS, created_at DESC)</td></tr>
+<tr><td>130</td><td><code>audience_roles</code></td><td>array&lt;string&gt;</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>deviation: admin, manager, supervisor · degraded: admin, manager, viewer · incomplete: admin, supervisor · batch: admin</td><td>rules: baca bila role ∈ audience_roles</td></tr>
+<tr><td>131</td><td><code>updated_at</code></td><td>timestamp</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>Hanya batch</td><td>opsional</td></tr>
+<tr><td>132</td><td><code>batch_status</code></td><td>string</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>batch: success/failed</td><td>opsional</td></tr>
+<tr><td>133</td><td><code>batch_log_id</code></td><td>string</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>batch</td><td>opsional</td></tr>
+<tr><td>134</td><td><code>deviation_pct</code></td><td>number</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>deviation</td><td>opsional</td></tr>
+<tr><td>135</td><td><code>rolling_mae_7d</code></td><td>number</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>degraded</td><td>opsional</td></tr>
+<tr><td>136</td><td><code>drift_threshold</code></td><td>number</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>degraded</td><td>opsional</td></tr>
+<tr><td>137</td><td><code>read_by</code></td><td>array&lt;string&gt;</td><td><code>notifications/{type}_{wh_id}_{YYYYMMDD}</code></td><td>uid yang sudah membaca (arrayUnion)</td><td>App; rules: penerima hanya menambah uid sendiri</td></tr>
+<tr><td>138</td><td><code>wh_id</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>Gudang</td><td>indeks (wh_id ASC, decided_at DESC)</td></tr>
+<tr><td>139</td><td><code>target_date</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>Tanggal target</td><td></td></tr>
+<tr><td>140</td><td><code>prediction_id</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>→ predictions</td><td>indeks (prediction_id ASC, decided_at DESC)</td></tr>
+<tr><td>141</td><td><code>recommended</code></td><td>map</td><td><code>decision_logs/{auto}</code></td><td>Manpower rekomendasi</td><td></td></tr>
+<tr><td>142</td><td><code>final</code></td><td>map</td><td><code>decision_logs/{auto}</code></td><td>Manpower final</td><td>rules: int ≥ 0</td></tr>
+<tr><td>143</td><td><code>decision_status</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>approved | adjusted</td><td>rules</td></tr>
+<tr><td>144</td><td><code>note</code></td><td>string|null</td><td><code>decision_logs/{auto}</code></td><td>Alasan</td><td>rules: wajib bila adjusted</td></tr>
+<tr><td>145</td><td><code>decided_by</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>uid</td><td>rules: = request.auth.uid</td></tr>
+<tr><td>146</td><td><code>decided_at</code></td><td>timestamp</td><td><code>decision_logs/{auto}</code></td><td>Waktu</td><td>rules: viewer ditolak baca; tanpa update/delete</td></tr>
+<tr><td>147</td><td><code>decided_by_name</code></td><td>string</td><td><code>decision_logs/{auto}</code></td><td>Nama (ekstensi App)</td><td></td></tr>
 </table>
-<h3>Ringkasan aturan keamanan per koleksi</h3><table><tr><th>Koleksi</th><th>Baca</th><th>Tulis</th></tr><tr><td>predictions</td><td>semua user login</td><td>update admin/supervisor, hanya actual_*; tanpa create/delete</td></tr><tr><td>operational_configs</td><td>semua user login</td><td>admin/manajer dengan validasi kapasitas & rasio</td></tr><tr><td>config_history, decision_logs</td><td>admin, manajer, supervisor</td><td>create admin/manajer atas nama sendiri; tanpa update/delete</td></tr><tr><td>notifications</td><td>role ∈ audience_roles</td><td>tidak ada</td></tr><tr><td>users/{uid}</td><td>pemilik</td><td>tidak ada (Console)</td></tr><tr><td>users/{uid}/notification_reads</td><td>pemilik</td><td>pemilik</td></tr><tr><td>daily_data, model_health, model_health_history, batch_logs, dataset_status, warehouses</td><td>semua user login</td><td>tidak ada (Admin SDK)</td></tr></table>
+<h3>Ringkasan aturan keamanan per koleksi</h3><table><tr><th>Koleksi</th><th>Baca</th><th>Tulis</th></tr><tr><td>predictions</td><td>semua user login</td><td>admin/supervisor: hanya actual_*; admin/manager: hanya decision_*; tanpa create/delete</td></tr><tr><td>operational_configs</td><td>semua user login</td><td>admin/manager dengan validasi kapasitas & rasio, wh_id = ID</td></tr><tr><td>operational_configs/{wh_id}/history, decision_logs</td><td>admin, manager, supervisor</td><td>create admin/manager atas nama sendiri; tanpa update/delete</td></tr><tr><td>notifications</td><td>role ∈ audience_roles</td><td>penerima hanya menambah uid sendiri ke read_by</td></tr><tr><td>users/{uid}</td><td>pemilik</td><td>tidak ada (Console)</td></tr><tr><td>daily_data, model_health, model_health_history, batch_logs, dataset_status, warehouses</td><td>semua user login</td><td>tidak ada (Admin SDK)</td></tr></table>
 <p class="sub">Dibuat oleh <code>tools/gen_db_docs.py</code> dari <code>tools/docs_db_model.py</code>; sumber: <code>docs/firestore_schema.md</code>, <code>firebase/firestore.rules</code>, <code>firebase/firestore.indexes.json</code>, <code>lib/core/data/models.dart</code>.</p>
 </body></html>

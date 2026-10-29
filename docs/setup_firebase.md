@@ -62,7 +62,7 @@ Panel "Demo prototipe" di Login mengisi akun ini otomatis (build emulator saja).
    ```
 7. Buat akun di **Authentication → Users → Add user** (Admin = Shift Lead; akun demo Manajer/Supervisor/Viewer bila perlu). Catat UID tiap akun.
 8. Di **Firestore → Start collection**:
-   - `users/<UID>`: `display_name` (string), `email` (string), `role` (`admin`/`manajer`/`supervisor`/`viewer`), `wh_id` = `WH-CKG-01`, `job_title` (opsional).
+   - `users/<UID>`: `name` (string), `role` (`admin`/`manager`/`supervisor`/`viewer`) — sesuai kontrak `docs/firestore_schema.md`; email diambil dari Firebase Auth, `job_title` (opsional).
    - `warehouses/WH-CKG-01`: `name` = `Hub Cakung`.
    - `operational_configs/WH-CKG-01`: `capacity_rider` 350, `capacity_driver` 800, `capacity_op_inbound` 500, `capacity_op_outbound` 600, `ratio_rider` 0.7, `ratio_driver` 0.3, `rounding` `ceil`, `updated_by` (UID admin), `updated_at` (timestamp).
 9. Jalankan script batch `wipas-research` agar `predictions`, `model_health`, dll. terisi (lihat repo riset; skema di `docs/firestore_schema.md`).
